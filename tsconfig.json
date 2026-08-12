@@ -4,6 +4,8 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "hono/jsx",
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

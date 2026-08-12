@@ -4,20 +4,22 @@
 
 **Prerequisite:** `docs/superpowers/plans/2026-08-12-promo-radar-pipeline.md` is complete and `pnpm scan` has produced real offers. This plan reads that data; it never writes to it.
 
-**Goal:** Three server-rendered screens — a filterable promo list, a cross-shop price comparison per product, and a leaflet page viewer with offer boxes overlaid — plus JSON endpoints for the same three views.
+**Goal:** Three server-rendered screens — a filterable promo list, a cross-shop price comparison per product, and a leaflet page viewer with offer boxes overlaid — plus JSON endpoints for the same views.
 
-**Architecture:** Next.js App Router with React Server Components querying Postgres through drizzle directly. All SQL lives in `src/lib/queries/*.ts` so it is unit-testable without rendering; pages are thin presentational wrappers. Page images are served by a route handler that reads from `storage/`, since they live outside `public/`.
+**Architecture:** A single Hono server rendering JSX to HTML. Every screen is read-only with a plain GET form for filters, so there is no client bundle, no bundler and no API layer between the page and the database: handlers call query functions that use drizzle directly. All SQL lives in `src/lib/queries/*.ts` so it is unit-testable without rendering; views are pure functions of their props. Page images live outside any public directory and are streamed by a route that resolves the path from the database.
 
-**Tech Stack:** next 16.3.0, React 19, drizzle-orm 0.45.2, Vitest 4.1.10. No CSS framework — one small stylesheet.
+**Tech Stack:** hono, @hono/node-server, drizzle-orm 0.45.2, Vitest 4.1.10, tsx. No React, no client JavaScript.
+
+**Why not Next.js:** these screens have zero client-side interactivity, so React Server Components and a webpack/turbopack toolchain would carry real weight for three static tables. Hono's JSX renders the same component model straight to HTML in one process.
 
 ## Global Constraints
 
 - Money is integer grosze in the database. Formatting to `zł` happens only in `src/lib/format.ts`.
 - Unit prices are already normalized to per-kg / per-l / per-piece by the pipeline. Comparison never re-derives them from pack sizes.
-- Every screen is a Server Component. No client-side data fetching, no `use client` except where a step explicitly says so.
+- No client-side JavaScript. Filters are a GET form; navigation is plain links.
 - A loyalty-gated offer (`requires_loyalty`) must be visually marked wherever a price is shown. Never present a card price as if it were the shelf price.
 - "Current" always means `valid_from <= now <= valid_to`.
-- Pinned: `next@16.3.0`.
+- JSX is Hono's, not React's: `"jsx": "react-jsx"` with `"jsxImportSource": "hono/jsx"`.
 
 ---
 
@@ -25,62 +27,47 @@
 
 | File | Responsibility |
 |---|---|
-| `next.config.ts` | Next config, path alias |
-| `src/app/layout.tsx` | shell, nav, stylesheet import |
-| `src/app/globals.css` | the entire stylesheet |
-| `src/lib/format.ts` | grosze → `zł`, dates, unit-price labels |
+| `src/lib/format.ts` | grosze → `zł`, dates, unit-price and promo labels |
 | `src/lib/queries/promos.ts` | list query + filters |
 | `src/lib/queries/product.ts` | one product with all its current offers |
 | `src/lib/queries/leaflet.ts` | one leaflet page with its offer boxes |
-| `src/app/page.tsx` | promo list screen |
-| `src/app/products/[id]/page.tsx` | comparison screen |
-| `src/app/leaflets/[id]/page.tsx` | page viewer screen |
-| `src/app/api/pages/[leafletId]/[pageNo]/route.ts` | serves page JPEGs from storage |
-| `src/app/api/promos/route.ts` | JSON list |
-| `src/app/api/products/[id]/route.ts` | JSON comparison |
+| `src/server/views/layout.tsx` | page shell + stylesheet |
+| `src/server/views/promos.tsx` | promo list view |
+| `src/server/views/product.tsx` | comparison view |
+| `src/server/views/leaflet.tsx` | page viewer view |
+| `src/server/app.ts` | Hono routes |
+| `src/server/index.ts` | node-server entry point |
 
 ---
 
-### Task 1: Next.js scaffold and formatting
+### Task 1: Server scaffold and formatting
 
 **Files:**
-- Create: `next.config.ts`, `src/app/layout.tsx`, `src/app/globals.css`, `src/lib/format.ts`
-- Modify: `package.json` (add next/react deps and `dev`/`build` scripts), `tsconfig.json` (add `jsx`, `next-env` include)
+- Create: `src/lib/format.ts`, `src/server/views/layout.tsx`, `src/server/app.ts`, `src/server/index.ts`
+- Modify: `package.json` (hono deps, `dev`/`start` scripts), `tsconfig.json` (jsx options)
 - Test: `tests/format.test.ts`
 
 **Interfaces:**
-- Consumes: nothing from the pipeline plan except `config`.
-- Produces: `formatZl(grosze: number | null): string`; `formatUnitPrice(grosze: number | null, basis: 'kg' | 'l' | 'pcs' | null): string`; `formatRange(from: Date | null, to: Date | null): string`; `formatPromo(kind: string, minQty: number | null, discountPercent: number | null): string`.
+- Produces: `formatZl(grosze: number | null): string`; `formatUnitPrice(grosze: number | null, basis: 'kg' | 'l' | 'pcs' | null): string`; `formatRange(from: Date | null, to: Date | null): string`; `formatPromo(kind: string, minQty: number | null, discountPercent: number | null): string`; `Layout(props: { title: string; children: unknown })`; `app` (Hono instance).
 
-- [ ] **Step 1: Install Next and add scripts**
+- [ ] **Step 1: Install and add scripts**
 
 ```bash
-pnpm add next@16.3.0 react@19.2.0 react-dom@19.2.0
-pnpm add -D @types/react@19.2.0 @types/react-dom@19.2.0
+pnpm add hono @hono/node-server
 ```
 
 Add to `package.json` scripts:
 
 ```json
-"dev": "next dev",
-"build": "next build",
-"start": "next start"
+"dev": "tsx watch src/server/index.ts",
+"start": "tsx src/server/index.ts"
 ```
 
-- [ ] **Step 2: Add `next.config.ts`**
+- [ ] **Step 2: Add JSX options to `tsconfig.json`**
 
-```ts
-import type { NextConfig } from 'next'
+In `compilerOptions`: `"jsx": "react-jsx"`, `"jsxImportSource": "hono/jsx"`.
 
-const config: NextConfig = { experimental: { typedRoutes: true } }
-export default config
-```
-
-- [ ] **Step 3: Extend `tsconfig.json`**
-
-Add to `compilerOptions`: `"jsx": "preserve"`, `"lib": ["ES2023", "DOM"]`, `"plugins": [{ "name": "next" }]`, `"allowJs": true`, `"incremental": true`, `"noEmit": true`. Add `"next-env.d.ts"` and `".next/types/**/*.ts"` to `include`.
-
-- [ ] **Step 4: Write the failing test `tests/format.test.ts`**
+- [ ] **Step 3: Write the failing test `tests/format.test.ts`**
 
 ```ts
 import { describe, it, expect } from 'vitest'
@@ -132,12 +119,12 @@ describe('formatPromo', () => {
 })
 ```
 
-- [ ] **Step 5: Run it to verify it fails**
+- [ ] **Step 4: Run it to verify it fails**
 
 Run: `pnpm vitest run tests/format.test.ts`
 Expected: FAIL — cannot resolve `@/lib/format`.
 
-- [ ] **Step 6: Implement `src/lib/format.ts`**
+- [ ] **Step 5: Implement `src/lib/format.ts`**
 
 ```ts
 export function formatZl(grosze: number | null): string {
@@ -182,92 +169,117 @@ export function formatPromo(
 }
 ```
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [ ] **Step 6: Run the test to verify it passes**
 
 Run: `pnpm vitest run tests/format.test.ts`
 Expected: PASS.
 
-- [ ] **Step 8: Create `src/app/globals.css`**
+- [ ] **Step 7: Implement `src/server/views/layout.tsx`**
 
-```css
-:root { --fg: #1a1a1a; --muted: #6b6b6b; --line: #e3e3e3; --accent: #c8102e; }
-* { box-sizing: border-box; }
-body {
-  margin: 0; color: var(--fg); background: #fff;
-  font: 15px/1.5 system-ui, -apple-system, sans-serif;
-}
-a { color: inherit; }
-header.top {
-  display: flex; gap: 1rem; align-items: baseline;
-  padding: 1rem 1.5rem; border-bottom: 1px solid var(--line);
-}
-header.top strong { color: var(--accent); }
-main { padding: 1.5rem; max-width: 1100px; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--line); }
-th { font-weight: 600; color: var(--muted); font-size: 13px; }
-.muted { color: var(--muted); }
-.price { font-weight: 700; white-space: nowrap; }
-.badge {
-  display: inline-block; padding: .1rem .4rem; border-radius: 3px;
-  font-size: 12px; background: #f2f2f2;
-}
-.badge.card { background: #fff3cd; }
-.badge.review { background: #ffe0e0; }
-form.filters { display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
-input, select, button { padding: .35rem .5rem; font: inherit; }
-.viewer { position: relative; display: inline-block; }
-.viewer img { max-width: 100%; height: auto; display: block; }
-.viewer .box {
-  position: absolute; border: 2px solid var(--accent);
-  background: rgba(200,16,46,.08);
-}
-```
-
-- [ ] **Step 9: Create `src/app/layout.tsx`**
+The stylesheet is inlined, so there is nothing static to serve.
 
 ```tsx
-import type { ReactNode } from 'react'
-import './globals.css'
+const CSS = `
+:root { --fg:#1a1a1a; --muted:#6b6b6b; --line:#e3e3e3; --accent:#c8102e; }
+* { box-sizing:border-box; }
+body { margin:0; color:var(--fg); background:#fff;
+  font:15px/1.5 system-ui,-apple-system,sans-serif; }
+a { color:inherit; }
+header.top { display:flex; gap:1rem; align-items:baseline;
+  padding:1rem 1.5rem; border-bottom:1px solid var(--line); }
+header.top strong { color:var(--accent); }
+main { padding:1.5rem; max-width:1150px; }
+table { width:100%; border-collapse:collapse; }
+th,td { text-align:left; padding:.5rem .6rem; border-bottom:1px solid var(--line); }
+th { font-weight:600; color:var(--muted); font-size:13px; }
+.muted { color:var(--muted); }
+.price { font-weight:700; white-space:nowrap; }
+.badge { display:inline-block; padding:.1rem .4rem; border-radius:3px;
+  font-size:12px; background:#f2f2f2; }
+.badge.card { background:#fff3cd; }
+.badge.review { background:#ffe0e0; }
+.badge.best { background:#d7f5dd; }
+form.filters { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center;
+  margin-bottom:1.25rem; }
+input,select,button { padding:.35rem .5rem; font:inherit; }
+.viewer { position:relative; display:inline-block; max-width:100%; }
+.viewer img { max-width:100%; height:auto; display:block; }
+.viewer .box { position:absolute; border:2px solid var(--accent);
+  background:rgba(200,16,46,.08); }
+`
 
-export const metadata = { title: 'Promo Radar' }
-
-export default function RootLayout({ children }: { children: ReactNode }) {
+export function Layout(props: { title: string; children: unknown }) {
   return (
     <html lang="pl">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>{props.title}</title>
+        <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      </head>
       <body>
-        <header className="top">
+        <header class="top">
           <strong>Promo Radar</strong>
           <a href="/">Promocje</a>
         </header>
-        <main>{children}</main>
+        <main>{props.children}</main>
       </body>
     </html>
   )
 }
 ```
 
-- [ ] **Step 10: Verify the app builds and commit**
+- [ ] **Step 8: Implement `src/server/app.ts` and `src/server/index.ts`**
 
-```bash
-pnpm build
-git add -A
-git commit -m "feat: add Next.js shell and value formatting"
+```ts
+// src/server/app.ts
+import { Hono } from 'hono'
+
+export const app = new Hono()
+
+app.get('/health', (c) => c.text('ok'))
 ```
 
-Expected: build succeeds.
+```ts
+// src/server/index.ts
+import { serve } from '@hono/node-server'
+import { app } from '@/server/app'
+
+const port = Number(process.env.PORT ?? 3000)
+serve({ fetch: app.fetch, port })
+console.log(`promo-radar on http://localhost:${port}`)
+```
+
+- [ ] **Step 9: Verify the server boots**
+
+```bash
+pnpm dev &
+sleep 3
+curl -s http://localhost:3000/health
+kill %1
+```
+
+Expected: `ok`.
+
+- [ ] **Step 10: Commit**
+
+```bash
+pnpm typecheck
+git add -A
+git commit -m "feat: add Hono server shell and value formatting"
+```
 
 ---
 
 ### Task 2: Promo list
 
 **Files:**
-- Create: `src/lib/queries/promos.ts`, `src/app/page.tsx`, `src/app/api/promos/route.ts`
+- Create: `src/lib/queries/promos.ts`, `src/server/views/promos.tsx`
+- Modify: `src/server/app.ts`
 - Test: `tests/queries/promos.test.ts`
 
 **Interfaces:**
-- Consumes: `db`, schema tables, `formatZl`.
-- Produces: `interface PromoFilters { q?: string; shop?: string; crossShopOnly?: boolean; needsReview?: boolean; sort?: 'discount' | 'unit'; now?: Date }`; `interface PromoRow { offerId: string; productId: string | null; rawName: string; shopSlug: string; priceGrosze: number | null; unitPriceGrosze: number | null; unitBasis: 'kg' | 'l' | 'pcs' | null; promoKind: string; minQty: number | null; discountPercent: number | null; requiresLoyalty: boolean; needsReview: boolean; validFrom: Date | null; validTo: Date | null; shopCount: number }`; `listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]>`.
+- Produces: `interface PromoFilters { q?: string; shop?: string; crossShopOnly?: boolean; needsReview?: boolean; sort?: 'discount' | 'unit'; now?: Date }`; `interface PromoRow { offerId: string; productId: string | null; rawName: string; shopSlug: string; priceGrosze: number | null; unitPriceGrosze: number | null; unitBasis: 'kg' | 'l' | 'pcs' | null; promoKind: string; minQty: number | null; discountPercent: number | null; requiresLoyalty: boolean; needsReview: boolean; validFrom: Date | null; validTo: Date | null; shopCount: number }`; `listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]>`; `PromosView(props: { rows: PromoRow[]; filters: PromoFilters })`.
 
 `shopCount` is the number of distinct shops currently promoting that product — the value that makes `crossShopOnly` meaningful.
 
@@ -276,11 +288,11 @@ Expected: build succeeds.
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import pg from 'pg'
 import { listPromos } from '@/lib/queries/promos'
 import { leaflets, offers, products, shops } from '@/lib/db/schema'
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST })
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_TEST })
 const db = drizzle(pool)
 const NOW = new Date('2026-08-13T12:00:00Z')
 
@@ -315,18 +327,17 @@ async function seed() {
     })
   }
 
-  // Single-shop offer, and one that has already expired.
-  const [lidlLeaflet] = await db.select().from(leaflets).limit(1)
+  const [firstLeaflet] = await db.select().from(leaflets).limit(1)
   await db.insert(offers).values([
     {
-      leafletId: lidlLeaflet!.id, pageNo: 1, rawName: 'Chleb pszenny, 500 g',
+      leafletId: firstLeaflet!.id, pageNo: 1, rawName: 'Chleb pszenny, 500 g',
       name: 'chleb pszenny', priceGrosze: 349, promoKind: 'price',
       productId: other!.id, dateSource: 'offer',
       validFrom: new Date('2026-08-12T00:00:00Z'),
       validTo: new Date('2026-08-14T00:00:00Z'),
     },
     {
-      leafletId: lidlLeaflet!.id, pageNo: 1, rawName: 'Stara promocja, 1 kg',
+      leafletId: firstLeaflet!.id, pageNo: 1, rawName: 'Stara promocja, 1 kg',
       name: 'stara promocja', priceGrosze: 999, promoKind: 'price',
       productId: other!.id, dateSource: 'offer',
       validFrom: new Date('2026-07-01T00:00:00Z'),
@@ -369,8 +380,7 @@ describe('listPromos', () => {
   })
 
   it('searches by name, case-insensitively', async () => {
-    const rows = await listPromos(db, { now: NOW, q: 'masło' })
-    expect(rows).toHaveLength(2)
+    expect(await listPromos(db, { now: NOW, q: 'masło' })).toHaveLength(2)
     expect(await listPromos(db, { now: NOW, q: 'MASŁO' })).toHaveLength(2)
   })
 
@@ -443,10 +453,7 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
        and o2.valid_from <= ${now} and o2.valid_to >= ${now}
   )`
 
-  const where: SQL[] = [
-    lte(offers.validFrom, now),
-    gte(offers.validTo, now),
-  ]
+  const where: SQL[] = [lte(offers.validFrom, now), gte(offers.validTo, now)]
   if (f.shop) where.push(eq(shops.slug, f.shop))
   if (f.q) where.push(sql`${offers.rawName} ilike ${'%' + f.q + '%'}`)
   if (f.needsReview) where.push(eq(offers.needsReview, true))
@@ -490,55 +497,47 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
 Run: `pnpm vitest run tests/queries/promos.test.ts`
 Expected: PASS — eight tests green.
 
-- [ ] **Step 5: Implement `src/app/page.tsx`**
+- [ ] **Step 5: Implement `src/server/views/promos.tsx`**
 
 ```tsx
-import { db } from '@/lib/db/client'
-import { listPromos } from '@/lib/queries/promos'
+import { Layout } from '@/server/views/layout'
 import { formatPromo, formatRange, formatUnitPrice, formatZl } from '@/lib/format'
+import type { PromoFilters, PromoRow } from '@/lib/queries/promos'
 
-export const dynamic = 'force-dynamic'
+const SHOPS = [
+  ['', 'Wszystkie sklepy'],
+  ['biedronka', 'Biedronka'],
+  ['lidl', 'Lidl'],
+  ['kaufland', 'Kaufland'],
+] as const
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | undefined>>
-}) {
-  const sp = await searchParams
-  const rows = await listPromos(db, {
-    q: sp.q,
-    shop: sp.shop,
-    crossShopOnly: sp.cross === '1',
-    needsReview: sp.review === '1',
-    sort: sp.sort === 'unit' ? 'unit' : 'discount',
-  })
-
+export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
+  const { rows, filters } = props
   return (
-    <>
-      <form className="filters">
-        <input name="q" placeholder="Szukaj produktu" defaultValue={sp.q ?? ''} />
-        <select name="shop" defaultValue={sp.shop ?? ''}>
-          <option value="">Wszystkie sklepy</option>
-          <option value="biedronka">Biedronka</option>
-          <option value="lidl">Lidl</option>
-          <option value="kaufland">Kaufland</option>
+    <Layout title="Promocje — Promo Radar">
+      <form class="filters" method="get" action="/">
+        <input type="search" name="q" placeholder="Szukaj produktu" value={filters.q ?? ''} />
+        <select name="shop">
+          {SHOPS.map(([value, label]) => (
+            <option value={value} selected={(filters.shop ?? '') === value}>{label}</option>
+          ))}
         </select>
-        <select name="sort" defaultValue={sp.sort ?? 'discount'}>
-          <option value="discount">Największa zniżka</option>
-          <option value="unit">Najniższa cena jednostkowa</option>
+        <select name="sort">
+          <option value="discount" selected={filters.sort !== 'unit'}>Największa zniżka</option>
+          <option value="unit" selected={filters.sort === 'unit'}>Najniższa cena jednostkowa</option>
         </select>
         <label>
-          <input type="checkbox" name="cross" value="1" defaultChecked={sp.cross === '1'} />{' '}
-          Tylko w kilku sklepach
+          <input type="checkbox" name="cross" value="1" checked={filters.crossShopOnly} />
+          {' '}Tylko w kilku sklepach
         </label>
         <label>
-          <input type="checkbox" name="review" value="1" defaultChecked={sp.review === '1'} />{' '}
-          Do sprawdzenia
+          <input type="checkbox" name="review" value="1" checked={filters.needsReview} />
+          {' '}Do sprawdzenia
         </label>
         <button type="submit">Filtruj</button>
       </form>
 
-      <p className="muted">{rows.length} promocji</p>
+      <p class="muted">{rows.length} promocji</p>
       <table>
         <thead>
           <tr>
@@ -548,17 +547,17 @@ export default async function Home({
         </thead>
         <tbody>
           {rows.map((r) => (
-            <tr key={r.offerId}>
+            <tr>
               <td>
                 {r.productId
                   ? <a href={`/products/${r.productId}`}>{r.rawName}</a>
                   : r.rawName}
-                {r.needsReview && <> <span className="badge review">do sprawdzenia</span></>}
+                {r.needsReview ? <> <span class="badge review">do sprawdzenia</span></> : null}
               </td>
               <td>{r.shopSlug}</td>
-              <td className="price">
+              <td class="price">
                 {formatZl(r.priceGrosze)}
-                {r.requiresLoyalty && <> <span className="badge card">z kartą</span></>}
+                {r.requiresLoyalty ? <> <span class="badge card">z kartą</span></> : null}
               </td>
               <td>{formatUnitPrice(r.unitPriceGrosze, r.unitBasis)}</td>
               <td>{formatPromo(r.promoKind, r.minQty, r.discountPercent)}</td>
@@ -568,38 +567,52 @@ export default async function Home({
           ))}
         </tbody>
       </table>
-    </>
+    </Layout>
   )
 }
 ```
 
-- [ ] **Step 6: Implement `src/app/api/promos/route.ts`**
+- [ ] **Step 6: Wire the routes in `src/server/app.ts`**
 
 ```ts
+import { Hono } from 'hono'
+import type { Context } from 'hono'
 import { db } from '@/lib/db/client'
-import { listPromos } from '@/lib/queries/promos'
+import { listPromos, type PromoFilters } from '@/lib/queries/promos'
+import { PromosView } from '@/server/views/promos'
 
-export const dynamic = 'force-dynamic'
+export const app = new Hono()
 
-export async function GET(request: Request) {
-  const p = new URL(request.url).searchParams
-  const rows = await listPromos(db, {
-    q: p.get('q') ?? undefined,
-    shop: p.get('shop') ?? undefined,
-    crossShopOnly: p.get('cross') === '1',
-    needsReview: p.get('review') === '1',
-    sort: p.get('sort') === 'unit' ? 'unit' : 'discount',
-  })
-  return Response.json(rows)
+function promoFilters(c: Context): PromoFilters {
+  const q = c.req.query()
+  return {
+    q: q.q || undefined,
+    shop: q.shop || undefined,
+    crossShopOnly: q.cross === '1',
+    needsReview: q.review === '1',
+    sort: q.sort === 'unit' ? 'unit' : 'discount',
+  }
 }
+
+app.get('/health', (c) => c.text('ok'))
+
+app.get('/', async (c) => {
+  const filters = promoFilters(c)
+  return c.html(<PromosView rows={await listPromos(db, filters)} filters={filters} />)
+})
+
+app.get('/api/promos', async (c) => c.json(await listPromos(db, promoFilters(c))))
 ```
+
+Rename the file to `src/server/app.tsx` so the JSX compiles, and update the
+import in `src/server/index.ts` to `@/server/app`.
 
 - [ ] **Step 7: Check the screen against real data**
 
 ```bash
 pnpm dev &
-sleep 6
-curl -s "http://localhost:3000/api/promos?cross=1" | head -c 400
+sleep 3
+curl -s "http://localhost:3000/api/promos" | head -c 300
 curl -s "http://localhost:3000/" | grep -c "<tr>"
 kill %1
 ```
@@ -609,7 +622,8 @@ Expected: JSON rows from your scanned data, and a positive row count in the HTML
 - [ ] **Step 8: Commit**
 
 ```bash
-git add src/lib/queries/promos.ts src/app/page.tsx src/app/api/promos tests/queries/
+pnpm typecheck
+git add -A
 git commit -m "feat: add the promo list screen and JSON endpoint"
 ```
 
@@ -618,12 +632,12 @@ git commit -m "feat: add the promo list screen and JSON endpoint"
 ### Task 3: Cross-shop comparison
 
 **Files:**
-- Create: `src/lib/queries/product.ts`, `src/app/products/[id]/page.tsx`, `src/app/api/products/[id]/route.ts`
+- Create: `src/lib/queries/product.ts`, `src/server/views/product.tsx`
+- Modify: `src/server/app.tsx`
 - Test: `tests/queries/product.test.ts`
 
 **Interfaces:**
-- Consumes: `db`, schema, formatters.
-- Produces: `interface ProductOffer { offerId: string; shopSlug: string; leafletId: string; pageNo: number; priceGrosze: number | null; priceBefore: number | null; priceRegular: number | null; unitPriceGrosze: number | null; unitBasis: 'kg' | 'l' | 'pcs' | null; promoKind: string; minQty: number | null; discountPercent: number | null; requiresLoyalty: boolean; purchaseLimit: string | null; validFrom: Date | null; validTo: Date | null; rawName: string; isCheapest: boolean }`; `interface ProductDetail { id: string; displayName: string; brand: string | null; sizeValue: number | null; sizeUnit: 'g' | 'ml' | 'pcs' | null; offers: ProductOffer[] }`; `getProduct(db: Db, id: string, now?: Date): Promise<ProductDetail | null>`.
+- Produces: `interface ProductOffer { offerId: string; shopSlug: string; leafletId: string; pageNo: number; rawName: string; priceGrosze: number | null; priceBefore: number | null; priceRegular: number | null; unitPriceGrosze: number | null; unitBasis: 'kg' | 'l' | 'pcs' | null; promoKind: string; minQty: number | null; discountPercent: number | null; requiresLoyalty: boolean; purchaseLimit: string | null; validFrom: Date | null; validTo: Date | null; isCheapest: boolean }`; `interface ProductDetail { id: string; displayName: string; brand: string | null; sizeValue: number | null; sizeUnit: 'g' | 'ml' | 'pcs' | null; offers: ProductOffer[] }`; `getProduct(db: Db, id: string, now?: Date): Promise<ProductDetail | null>`; `ProductView(props: { product: ProductDetail })`.
 
 `isCheapest` is computed on the **normalized unit price** and only among offers
 that share the same `unitBasis`, so 200 g and 500 g packs are ranked honestly and
@@ -634,11 +648,11 @@ a per-piece price is never compared against a per-kilogram one.
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import pg from 'pg'
 import { getProduct } from '@/lib/queries/product'
 import { leaflets, offers, products, shops } from '@/lib/db/schema'
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST })
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_TEST })
 const db = drizzle(pool)
 const NOW = new Date('2026-08-13T12:00:00Z')
 let productId: string
@@ -792,8 +806,7 @@ export async function getProduct(
       gte(offers.validTo, now),
     ))
 
-  // Cheapest is decided per unit basis, never across bases: a per-piece price
-  // must not win against a per-kilogram one.
+  // Cheapest is decided per unit basis, never across bases.
   const bestByBasis = new Map<string, number>()
   for (const r of rows) {
     if (r.unitBasis === null || r.unitPriceGrosze === null) continue
@@ -825,36 +838,22 @@ export async function getProduct(
 Run: `pnpm vitest run tests/queries/product.test.ts`
 Expected: PASS — four tests green.
 
-- [ ] **Step 5: Implement `src/app/products/[id]/page.tsx`**
+- [ ] **Step 5: Implement `src/server/views/product.tsx`**
 
 ```tsx
-import { notFound } from 'next/navigation'
-import { db } from '@/lib/db/client'
-import { getProduct } from '@/lib/queries/product'
+import { Layout } from '@/server/views/layout'
 import { formatPromo, formatRange, formatUnitPrice, formatZl } from '@/lib/format'
+import type { ProductDetail } from '@/lib/queries/product'
 
-export const dynamic = 'force-dynamic'
-
-export default async function ProductPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = await params
-  const product = await getProduct(db, id)
-  if (!product) notFound()
-
-  const size = product.sizeValue
-    ? `${product.sizeValue} ${product.sizeUnit}`
-    : 'na wagę / bez rozmiaru'
-
+export function ProductView(props: { product: ProductDetail }) {
+  const p = props.product
+  const size = p.sizeValue ? `${p.sizeValue} ${p.sizeUnit}` : 'na wagę / bez rozmiaru'
   return (
-    <>
-      <h1>{product.displayName}</h1>
-      <p className="muted">
-        {product.brand ?? 'bez marki'} · {size} · {product.offers.length} ofert
+    <Layout title={`${p.displayName} — Promo Radar`}>
+      <h1>{p.displayName}</h1>
+      <p class="muted">
+        {p.brand ?? 'bez marki'} · {size} · {p.offers.length} ofert
       </p>
-
       <table>
         <thead>
           <tr>
@@ -863,60 +862,52 @@ export default async function ProductPage({
           </tr>
         </thead>
         <tbody>
-          {product.offers.map((o) => (
-            <tr key={o.offerId}>
+          {p.offers.map((o) => (
+            <tr>
               <td>{o.shopSlug}</td>
-              <td className="price">
+              <td class="price">
                 {formatZl(o.priceGrosze)}
-                {o.requiresLoyalty && <> <span className="badge card">z kartą</span></>}
+                {o.requiresLoyalty ? <> <span class="badge card">z kartą</span></> : null}
               </td>
               <td>
                 {formatUnitPrice(o.unitPriceGrosze, o.unitBasis)}
-                {o.isCheapest && <> <span className="badge">najtaniej</span></>}
+                {o.isCheapest ? <> <span class="badge best">najtaniej</span></> : null}
               </td>
-              <td className="muted">{formatZl(o.priceBefore)}</td>
-              <td className="muted">{formatZl(o.priceRegular)}</td>
+              <td class="muted">{formatZl(o.priceBefore)}</td>
+              <td class="muted">{formatZl(o.priceRegular)}</td>
               <td>{formatPromo(o.promoKind, o.minQty, o.discountPercent)}</td>
               <td>{formatRange(o.validFrom, o.validTo)}</td>
-              <td className="muted">{o.purchaseLimit ?? '—'}</td>
-              <td>
-                <a href={`/leaflets/${o.leafletId}?page=${o.pageNo}`}>
-                  s. {o.pageNo}
-                </a>
-              </td>
+              <td class="muted">{o.purchaseLimit ?? '—'}</td>
+              <td><a href={`/leaflets/${o.leafletId}?page=${o.pageNo}`}>s. {o.pageNo}</a></td>
             </tr>
           ))}
         </tbody>
       </table>
-    </>
+    </Layout>
   )
 }
 ```
 
-- [ ] **Step 6: Implement `src/app/api/products/[id]/route.ts`**
+- [ ] **Step 6: Add routes to `src/server/app.tsx`**
 
-```ts
-import { db } from '@/lib/db/client'
-import { getProduct } from '@/lib/queries/product'
+```tsx
+app.get('/products/:id', async (c) => {
+  const product = await getProduct(db, c.req.param('id'))
+  if (!product) return c.text('not found', 404)
+  return c.html(<ProductView product={product} />)
+})
 
-export const dynamic = 'force-dynamic'
-
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ id: string }> },
-) {
-  const { id } = await params
-  const product = await getProduct(db, id)
-  if (!product) return Response.json({ error: 'not found' }, { status: 404 })
-  return Response.json(product)
-}
+app.get('/api/products/:id', async (c) => {
+  const product = await getProduct(db, c.req.param('id'))
+  return product ? c.json(product) : c.json({ error: 'not found' }, 404)
+})
 ```
 
 - [ ] **Step 7: Commit**
 
 ```bash
-pnpm build
-git add src/lib/queries/product.ts src/app/products src/app/api/products tests/queries/product.test.ts
+pnpm typecheck
+git add -A
 git commit -m "feat: add cross-shop comparison screen"
 ```
 
@@ -925,27 +916,27 @@ git commit -m "feat: add cross-shop comparison screen"
 ### Task 4: Leaflet page viewer with offer boxes
 
 **Files:**
-- Create: `src/lib/queries/leaflet.ts`, `src/app/leaflets/[id]/page.tsx`, `src/app/api/pages/[leafletId]/[pageNo]/route.ts`
+- Create: `src/lib/queries/leaflet.ts`, `src/server/views/leaflet.tsx`
+- Modify: `src/server/app.tsx`
 - Test: `tests/queries/leaflet.test.ts`
 
 **Interfaces:**
-- Consumes: `db`, schema, `config.storageDir`.
-- Produces: `interface PageBox { offerId: string; rawName: string; priceGrosze: number | null; x: number; y: number; w: number; h: number }`; `interface LeafletPageView { leafletId: string; shopSlug: string; pageNo: number; pageCount: number; imageUrl: string; boxes: PageBox[] }`; `getLeafletPage(db: Db, leafletId: string, pageNo: number): Promise<LeafletPageView | null>`.
+- Produces: `interface PageBox { offerId: string; rawName: string; priceGrosze: number | null; x: number; y: number; w: number; h: number }`; `interface LeafletPageView { leafletId: string; shopSlug: string; pageNo: number; pageCount: number; imageUrl: string; boxes: PageBox[] }`; `getLeafletPage(db: Db, leafletId: string, pageNo: number): Promise<LeafletPageView | null>`; `LeafletView(props: { view: LeafletPageView })`.
 
-Page images live in `storage/`, outside `public/`, so a route handler streams
-them. It resolves the path from the database rather than from user input, so a
-crafted `pageNo` cannot escape the storage directory.
+Page images live in `storage/`, so a route streams them. It resolves the path
+from the database rather than from user input, so a crafted `pageNo` cannot
+escape the storage directory.
 
 - [ ] **Step 1: Write the failing test `tests/queries/leaflet.test.ts`**
 
 ```ts
 import { describe, it, expect, beforeEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import pg from 'pg'
 import { getLeafletPage } from '@/lib/queries/leaflet'
 import { leaflets, leafletPages, offers, shops } from '@/lib/db/schema'
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL_TEST })
+const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_TEST })
 const db = drizzle(pool)
 let leafletId: string
 
@@ -1095,110 +1086,84 @@ export async function getLeafletPage(
 Run: `pnpm vitest run tests/queries/leaflet.test.ts`
 Expected: PASS — three tests green.
 
-- [ ] **Step 5: Implement `src/app/api/pages/[leafletId]/[pageNo]/route.ts`**
+- [ ] **Step 5: Implement `src/server/views/leaflet.tsx`**
 
-```ts
-import { readFile } from 'node:fs/promises'
-import { and, eq } from 'drizzle-orm'
-import { db } from '@/lib/db/client'
-import { leafletPages } from '@/lib/db/schema'
+```tsx
+import { Layout } from '@/server/views/layout'
+import { formatZl } from '@/lib/format'
+import type { LeafletPageView } from '@/lib/queries/leaflet'
 
-export const dynamic = 'force-dynamic'
+export function LeafletView(props: { view: LeafletPageView }) {
+  const v = props.view
+  const prev = v.pageNo > 1 ? v.pageNo - 1 : null
+  const next = v.pageNo < v.pageCount ? v.pageNo + 1 : null
+  return (
+    <Layout title={`${v.shopSlug} s.${v.pageNo} — Promo Radar`}>
+      <h1>{v.shopSlug} — strona {v.pageNo} z {v.pageCount}</h1>
+      <p>
+        {prev ? <a href={`/leaflets/${v.leafletId}?page=${prev}`}>← poprzednia</a> : null}{' '}
+        {next ? <a href={`/leaflets/${v.leafletId}?page=${next}`}>następna →</a> : null}{' '}
+        <span class="muted">{v.boxes.length} ofert na tej stronie</span>
+      </p>
+      <div class="viewer">
+        <img src={v.imageUrl} alt={`strona ${v.pageNo}`} />
+        {v.boxes.map((b) => (
+          <span
+            class="box"
+            title={`${b.rawName} — ${formatZl(b.priceGrosze)}`}
+            style={`left:${b.x * 100}%;top:${b.y * 100}%;width:${b.w * 100}%;height:${b.h * 100}%`}
+          />
+        ))}
+      </div>
+    </Layout>
+  )
+}
+```
 
-export async function GET(
-  _request: Request,
-  { params }: { params: Promise<{ leafletId: string; pageNo: string }> },
-) {
-  const { leafletId, pageNo } = await params
-  const n = Number(pageNo)
-  if (!Number.isInteger(n) || n < 1) {
-    return new Response('bad page', { status: 400 })
-  }
+- [ ] **Step 6: Add routes to `src/server/app.tsx`**
+
+```tsx
+app.get('/leaflets/:id', async (c) => {
+  const pageNo = Number(c.req.query('page') ?? '1')
+  const view = await getLeafletPage(
+    db, c.req.param('id'), Number.isInteger(pageNo) && pageNo > 0 ? pageNo : 1,
+  )
+  if (!view) return c.text('not found', 404)
+  return c.html(<LeafletView view={view} />)
+})
+
+app.get('/api/pages/:leafletId/:pageNo', async (c) => {
+  const n = Number(c.req.param('pageNo'))
+  if (!Number.isInteger(n) || n < 1) return c.text('bad page', 400)
 
   // The path comes from the database, never from the request.
   const [page] = await db
     .select({ imagePath: leafletPages.imagePath })
     .from(leafletPages)
-    .where(and(eq(leafletPages.leafletId, leafletId), eq(leafletPages.pageNo, n)))
+    .where(and(
+      eq(leafletPages.leafletId, c.req.param('leafletId')),
+      eq(leafletPages.pageNo, n),
+    ))
     .limit(1)
-  if (!page) return new Response('not found', { status: 404 })
+  if (!page) return c.text('not found', 404)
 
   try {
     const body = await readFile(page.imagePath)
-    return new Response(body, {
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Cache-Control': 'public, max-age=86400',
-      },
+    return c.body(body, 200, {
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'public, max-age=86400',
     })
   } catch {
-    return new Response('image missing on disk', { status: 410 })
+    return c.text('image missing on disk', 410)
   }
-}
-```
-
-- [ ] **Step 6: Implement `src/app/leaflets/[id]/page.tsx`**
-
-```tsx
-import { notFound } from 'next/navigation'
-import { db } from '@/lib/db/client'
-import { getLeafletPage } from '@/lib/queries/leaflet'
-import { formatZl } from '@/lib/format'
-
-export const dynamic = 'force-dynamic'
-
-export default async function LeafletPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>
-  searchParams: Promise<{ page?: string }>
-}) {
-  const { id } = await params
-  const { page } = await searchParams
-  const pageNo = Number(page ?? '1')
-  const view = await getLeafletPage(db, id, Number.isInteger(pageNo) ? pageNo : 1)
-  if (!view) notFound()
-
-  const prev = view.pageNo > 1 ? view.pageNo - 1 : null
-  const next = view.pageNo < view.pageCount ? view.pageNo + 1 : null
-
-  return (
-    <>
-      <h1>{view.shopSlug} — strona {view.pageNo} z {view.pageCount}</h1>
-      <p>
-        {prev && <a href={`/leaflets/${id}?page=${prev}`}>← poprzednia</a>}{' '}
-        {next && <a href={`/leaflets/${id}?page=${next}`}>następna →</a>}{' '}
-        <span className="muted">{view.boxes.length} ofert na tej stronie</span>
-      </p>
-
-      <div className="viewer">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={view.imageUrl} alt={`strona ${view.pageNo}`} />
-        {view.boxes.map((b) => (
-          <span
-            key={b.offerId}
-            className="box"
-            title={`${b.rawName} — ${formatZl(b.priceGrosze)}`}
-            style={{
-              left: `${b.x * 100}%`,
-              top: `${b.y * 100}%`,
-              width: `${b.w * 100}%`,
-              height: `${b.h * 100}%`,
-            }}
-          />
-        ))}
-      </div>
-    </>
-  )
-}
+})
 ```
 
 - [ ] **Step 7: Verify the overlay against a real page**
 
 ```bash
 pnpm dev &
-sleep 6
+sleep 3
 docker-compose exec -T db psql -U promo -d promo_radar -t -c \
   "select id from leaflets limit 1"
 # open http://localhost:3000/leaflets/<that-id>?page=1 in a browser
@@ -1213,14 +1178,14 @@ rather than fractions — tighten that sentence in `src/lib/extract/prompt.ts` a
 - [ ] **Step 8: Commit**
 
 ```bash
-pnpm build
-git add src/lib/queries/leaflet.ts src/app/leaflets src/app/api/pages tests/queries/leaflet.test.ts
+pnpm typecheck
+git add -A
 git commit -m "feat: add leaflet page viewer with offer overlays"
 ```
 
 ---
 
-### Task 5: Finish the docs
+### Task 5: Document the UI
 
 **Files:**
 - Modify: `README.md`
@@ -1233,6 +1198,8 @@ git commit -m "feat: add leaflet page viewer with offer overlays"
 ```bash
 pnpm dev     # http://localhost:3000
 ```
+
+A single Hono server rendering JSX to HTML. No client JavaScript, no bundler.
 
 | Route | What it shows |
 |---|---|
@@ -1251,19 +1218,16 @@ price and only among offers sharing the same basis (per kg, per l, or per piece)
 ```bash
 pnpm test
 pnpm typecheck
-pnpm build
 git add README.md
 git commit -m "docs: document the web UI"
 ```
-
-Expected: tests pass, no type errors, build succeeds.
 
 ---
 
 ## Verification
 
 - [ ] `pnpm test` passes (pipeline and UI suites).
-- [ ] `pnpm build` succeeds.
+- [ ] `pnpm typecheck` is clean.
 - [ ] `/` lists real promos, and the "cross-shop only" filter narrows to products promoted by more than one shop.
 - [ ] A product page shows one row per shop with the cheapest unit price marked, and loyalty prices badged.
 - [ ] A leaflet page renders with boxes that visually land on the promo tiles.
