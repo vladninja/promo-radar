@@ -1,3 +1,13 @@
+// Node does not read .env on its own, and every entry point here (dev, scan,
+// rescore, prune, reparse) needs DATABASE_URL and OPENAI_API_KEY. Variables
+// already present in the environment are not overwritten, so
+// `MAX_PAGES_PER_RUN=3 pnpm scan` still wins over the file.
+try {
+  process.loadEnvFile()
+} catch {
+  // No .env file — fall back to the ambient environment (CI, launchd, tests).
+}
+
 function required(name: string): string {
   const v = process.env[name]
   if (!v) throw new Error(`Missing env var ${name}`)
