@@ -69,8 +69,30 @@ function fakeVision(counter: { calls: number }): VisionClient {
 const deps = (counter: { calls: number }, maxPages = 400) => ({
   db, source: fakeSource, client: fakeVision(counter),
   storageDir: 'storage/test-scan', now: () => new Date('2026-08-12T12:00:00Z'),
-  maxPages,
+  maxPages, maxLeafletAgeDays: 14,
 })
+
+/** A source publishing leaflets at the given ISO dates, oldest listed first. */
+function sourceWithDates(dates: string[]): LeafletSource {
+  return {
+    ...fakeSource,
+    async discover() {
+      return dates.map((date, i) => ({
+        shopSlug: 'biedronka',
+        externalId: `L${i}`,
+        pdfUrl: 'https://example.test/a.pdf',
+        publishedAt: new Date(date),
+        coverUrl: null,
+      }))
+    },
+    async fetchAsset(l, destDir) {
+      await mkdir(join(destDir, 'biedronka'), { recursive: true })
+      const path = join(destDir, 'biedronka', `${l.externalId}.pdf`)
+      await copyFile('tests/fixtures/leaflet-2pages.pdf', path)
+      return { path, sha256: `h-${l.externalId}` }
+    },
+  }
+}
 
 describe('runScan', () => {
   it('ingests a leaflet, extracts its pages and creates offers', async () => {
@@ -150,6 +172,59 @@ describe('runScan', () => {
     const { rows } = await pool.query('select last_seen_date from source_cursors')
     expect(new Date(rows[0].last_seen_date).toISOString())
       .toBe('2026-08-12T10:17:04.000Z')
+  })
+
+  it('does not advance the cursor when the run was capped', async () => {
+    await runScan(deps({ calls: 0 }, 1))
+    const { rows } = await pool.query('select last_seen_date from source_cursors')
+    expect(rows).toHaveLength(0)
+  })
+
+  it('ignores leaflets published longer ago than the age limit', async () => {
+    const c = { calls: 0 }
+    const stats = await runScan({
+      ...deps(c),
+      source: sourceWithDates([
+        '2026-05-01T00:00:00Z',   // 103 days old — stale catalogue
+        '2026-07-20T00:00:00Z',   // 23 days old
+        '2026-08-11T00:00:00Z',   // yesterday
+      ]),
+    })
+    expect(stats.leafletsSkippedOld).toBe(2)
+    expect(stats.leafletsSeen).toBe(1)
+    expect(stats.leafletsNew).toBe(1)
+    const rows = await db.select().from(leaflets)
+    expect(rows.map((r) => r.externalId)).toEqual(['L2'])
+  })
+
+  it('spends its budget on the newest leaflet first', async () => {
+    const stats = await runScan({
+      ...deps({ calls: 0 }, 2),      // room for one 2-page leaflet only
+      source: sourceWithDates([
+        '2026-08-02T00:00:00Z',
+        '2026-08-10T00:00:00Z',       // newest
+      ]),
+    })
+    expect(stats.capped).toBe(true)
+    const rows = await db.select().from(leaflets)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.externalId).toBe('L1')
+  })
+
+  it('does not spend on an unfinished leaflet whose promotions have ended', async () => {
+    await runScan(deps({ calls: 0 }, 1))       // leaves one leaflet partial
+    await db.update(leaflets).set({
+      validTo: new Date('2026-08-01T00:00:00Z'),   // expired before "now"
+    })
+
+    const second = { calls: 0 }
+    const stats = await runScan({
+      ...deps(second),
+      source: { ...fakeSource, async discover() { return [] } },
+    })
+    expect(stats.leafletsSkippedExpired).toBe(1)
+    expect(stats.leafletsResumed).toBe(0)
+    expect(second.calls).toBe(0)
   })
 
   it('records a job run with stats', async () => {

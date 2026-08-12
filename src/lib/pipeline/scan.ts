@@ -24,10 +24,13 @@ export interface ScanDeps {
   storageDir: string
   now: () => Date
   maxPages: number
+  maxLeafletAgeDays: number
 }
 
 export interface ScanStats {
   leafletsSeen: number
+  leafletsSkippedOld: number
+  leafletsSkippedExpired: number
   leafletsNew: number
   leafletsResumed: number
   pagesExtracted: number
@@ -58,7 +61,8 @@ export async function isStale(
 export async function runScan(deps: ScanDeps): Promise<ScanStats> {
   const { db, source, client, storageDir, now } = deps
   const stats: ScanStats = {
-    leafletsSeen: 0, leafletsNew: 0, leafletsResumed: 0,
+    leafletsSeen: 0, leafletsSkippedOld: 0, leafletsSkippedExpired: 0,
+    leafletsNew: 0, leafletsResumed: 0,
     pagesExtracted: 0, pagesFailed: 0,
     offersCreated: 0, tokensIn: 0, tokensOut: 0, costUsd: 0, capped: false,
   }
@@ -70,11 +74,23 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
 
   try {
     const [cursor] = await db.select().from(sourceCursors).limit(1)
-    const discovered = await source.discover(
+    const all = await source.discover(
       config.shopAllowlist,
       cursor?.lastSeenDate ?? null,
     )
+
+    // Only leaflets that can still be current. Validity dates live inside the
+    // PDF, so publication age is the one signal available before paying to
+    // parse. Newest first, so a capped run spends its budget on the freshest.
+    const ageCutoff = new Date(
+      now().getTime() - deps.maxLeafletAgeDays * 24 * 3600 * 1000,
+    )
+    const discovered = all
+      .filter((d) => d.publishedAt >= ageCutoff)
+      .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+
     stats.leafletsSeen = discovered.length
+    stats.leafletsSkippedOld = all.length - discovered.length
 
     const shopRows = await db.select().from(shops)
     const shopIdBySlug = new Map(shopRows.map((s) => [s.slug, s.id]))
@@ -85,14 +101,21 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
     // hit the page cap, a page failed, or `reparse` cleared them. Discovery will
     // never return these again (the cursor has moved past their publication
     // date), so they are resumed from the database instead.
-    const unfinished = await db
+    const unfinishedAll = await db
       .select({
         id: leaflets.id, externalId: leaflets.externalId, pdfUrl: leaflets.pdfUrl,
-        publishedAt: leaflets.publishedAt, shopSlug: shops.slug,
+        publishedAt: leaflets.publishedAt, validTo: leaflets.validTo,
+        shopSlug: shops.slug,
       })
       .from(leaflets)
       .innerJoin(shops, eq(shops.id, leaflets.shopId))
       .where(sql`${leaflets.status} <> 'done'`)
+
+    // Finishing a leaflet whose promotions have already ended buys nothing.
+    const unfinished = unfinishedAll.filter(
+      (u) => u.validTo === null || u.validTo >= now(),
+    )
+    stats.leafletsSkippedExpired = unfinishedAll.length - unfinished.length
 
     const work: Array<{ leafletId: string | null; d: typeof discovered[number] }> = [
       ...unfinished.map((u) => ({
@@ -114,6 +137,8 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       const d = item.d
       const shopId = shopIdBySlug.get(d.shopSlug)
       if (!shopId) continue
+      // Stop before downloading a PDF there is no budget left to parse.
+      if (pageBudget <= 0) { stats.capped = true; break }
       // Only discovery advances the cursor; resumed leaflets are already behind it.
       if (item.leafletId === null && (!newestSeen || d.publishedAt > newestSeen)) {
         newestSeen = d.publishedAt
@@ -264,7 +289,10 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       if (stats.capped) break
     }
 
-    if (newestSeen) {
+    // A capped run leaves discovered-but-untouched leaflets behind. Advancing
+    // the cursor past them would hide them from every future run, so the cursor
+    // only moves when the whole discovered set was worked through.
+    if (newestSeen && !stats.capped) {
       await db.insert(sourceCursors)
         .values({ sourceSlug: source.slug, lastSeenDate: newestSeen })
         .onConflictDoUpdate({

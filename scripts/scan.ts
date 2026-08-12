@@ -13,6 +13,7 @@ try {
     storageDir: config.storageDir,
     now: () => new Date(),
     maxPages: config.maxPagesPerRun,
+    maxLeafletAgeDays: config.maxLeafletAgeDays,
   })
   console.log(JSON.stringify(stats))
 

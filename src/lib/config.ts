@@ -20,6 +20,13 @@ export const config = {
   visionModel: process.env.VISION_MODEL ?? 'gpt-5.6-luna',
   visionModelEscalation: process.env.VISION_MODEL_ESCALATION ?? 'gpt-5.6-terra',
   maxPagesPerRun: Number(process.env.MAX_PAGES_PER_RUN ?? 400),
+  /**
+   * Ignore leaflets published longer ago than this. Validity dates only exist
+   * inside the PDF, so publication age is the only cheap signal available
+   * before paying to parse. Polish weekly leaflets run about a week; 14 days
+   * leaves room for longer seasonal catalogues without dredging up the archive.
+   */
+  maxLeafletAgeDays: Number(process.env.MAX_LEAFLET_AGE_DAYS ?? 14),
   storageDir: process.env.STORAGE_DIR ?? './storage',
   sourceBaseUrl: 'https://www.gazetkipromocyjne.net',
   userAgent:

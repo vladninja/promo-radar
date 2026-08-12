@@ -41,6 +41,10 @@ async function getJson(url: string): Promise<unknown[]> {
   const res = await limit(() =>
     fetch(url, { headers: { 'User-Agent': config.userAgent } }),
   )
+  // Asking for a page past the last one answers 400 rest_post_invalid_page_number.
+  // That is the end of the results, not a failure — it happens whenever the
+  // total is an exact multiple of per_page.
+  if (res.status === 400) return []
   if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`)
   return (await res.json()) as unknown[]
 }
