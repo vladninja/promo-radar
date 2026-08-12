@@ -1,0 +1,146 @@
+{
+  "page_date_badge": null,
+  "issue_text": "NR 33/2026",
+  "tiles": [
+    {
+      "raw_name": "Winogrono jasne na wagę",
+      "brand": null,
+      "price": "6,99",
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": 58,
+      "promo_kind": "price",
+      "min_qty": null,
+      "unit_price_raw": null,
+      "requires_loyalty": false,
+      "purchase_limit": null,
+      "date_badge": "OFERTA OD 12.08 DO 14.08",
+      "bbox": {
+        "x": 0.057,
+        "y": 0.31,
+        "w": 0.49,
+        "h": 0.22
+      }
+    },
+    {
+      "raw_name": "Nektarynka na wagę",
+      "brand": null,
+      "price": "5,99",
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": 53,
+      "promo_kind": "price",
+      "min_qty": null,
+      "unit_price_raw": null,
+      "requires_loyalty": false,
+      "purchase_limit": null,
+      "date_badge": "OFERTA OD 12.08 DO 14.08",
+      "bbox": {
+        "x": 0.057,
+        "y": 0.48,
+        "w": 0.49,
+        "h": 0.25
+      }
+    },
+    {
+      "raw_name": "Karkówka grillowa pakowana próżniowo Czas na Grill, Mega Paka",
+      "brand": null,
+      "price": "7,99",
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": 72,
+      "promo_kind": "price",
+      "min_qty": null,
+      "unit_price_raw": null,
+      "requires_loyalty": false,
+      "purchase_limit": null,
+      "date_badge": "OFERTA OD 12.08 DO 14.08",
+      "bbox": {
+        "x": 0.057,
+        "y": 0.7,
+        "w": 0.49,
+        "h": 0.29
+      }
+    },
+    {
+      "raw_name": "Masło Ekstra Mleczna Dolina, 200 g",
+      "brand": "Mleczna Dolina",
+      "price": "1,99",
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": 60,
+      "promo_kind": "multibuy",
+      "min_qty": 3,
+      "unit_price_raw": null,
+      "requires_loyalty": true,
+      "purchase_limit": "Limit dzienny 3 szt. na kartę Moja Biedronka.",
+      "date_badge": "OFERTA OD 13.08 DO 14.08",
+      "bbox": {
+        "x": 0.566,
+        "y": 0.036,
+        "w": 0.415,
+        "h": 0.189
+      }
+    },
+    {
+      "raw_name": "WSZYSTKIE PACZKOWANE KIEŁBASY MORLINY",
+      "brand": "Morliny",
+      "price": null,
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": null,
+      "promo_kind": "bogo",
+      "min_qty": null,
+      "unit_price_raw": null,
+      "requires_loyalty": true,
+      "purchase_limit": "Limit dzienny 6 szt. (maks. 3 gratis) na kartę Moja Biedronka.",
+      "date_badge": "OFERTA OD 12.08 DO 14.08",
+      "bbox": {
+        "x": 0.566,
+        "y": 0.226,
+        "w": 0.415,
+        "h": 0.286
+      }
+    },
+    {
+      "raw_name": "Napój gazowany, 2 l: Coca-Cola, Coca-Cola Zero Cukru",
+      "brand": "Coca-Cola",
+      "price": "5,99",
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": null,
+      "promo_kind": "multibuy",
+      "min_qty": 2,
+      "unit_price_raw": null,
+      "requires_loyalty": true,
+      "purchase_limit": "Limit dzienny 6 szt. na kartę Moja Biedronka.",
+      "date_badge": "OFERTA OD 12.08 DO 14.08",
+      "bbox": {
+        "x": 0.566,
+        "y": 0.512,
+        "w": 0.415,
+        "h": 0.268
+      }
+    },
+    {
+      "raw_name": "Ręczniki kuchenne Queen Milla, 2 rolki",
+      "brand": "Queen Milla",
+      "price": "2,99",
+      "price_before": null,
+      "price_regular": null,
+      "discount_percent": null,
+      "promo_kind": "multibuy",
+      "min_qty": 3,
+      "unit_price_raw": "1,50 zł/rolka",
+      "requires_loyalty": true,
+      "purchase_limit": null,
+      "date_badge": "OFERTA OD 12.08 DO 14.08",
+      "bbox": {
+        "x": 0.566,
+        "y": 0.78,
+        "w": 0.415,
+        "h": 0.208
+      }
+    }
+  ]
+}

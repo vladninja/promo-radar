@@ -124,6 +124,27 @@ describe('runScan', () => {
     expect(l!.status).toBe('partial')
   })
 
+  it('resumes a capped leaflet on the next run, even though discovery skips it', async () => {
+    const first = { calls: 0 }
+    await runScan(deps(first, 1))
+    expect(first.calls).toBe(1)
+
+    // Discovery now returns nothing: the cursor has moved past this leaflet.
+    const emptySource: LeafletSource = {
+      ...fakeSource,
+      async discover() { return [] },
+    }
+    const second = { calls: 0 }
+    const stats = await runScan({ ...deps(second), source: emptySource })
+
+    expect(stats.leafletsResumed).toBe(1)
+    expect(second.calls).toBe(1)            // the remaining page, not the done one
+    expect(stats.pagesExtracted).toBe(1)
+    expect(await db.select().from(leafletPages)).toHaveLength(2)
+    const [l] = await db.select().from(leaflets)
+    expect(l!.status).toBe('done')
+  })
+
   it('advances the source cursor to the newest publication seen', async () => {
     await runScan(deps({ calls: 0 }))
     const { rows } = await pool.query('select last_seen_date from source_cursors')

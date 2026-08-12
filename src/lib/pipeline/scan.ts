@@ -29,6 +29,7 @@ export interface ScanDeps {
 export interface ScanStats {
   leafletsSeen: number
   leafletsNew: number
+  leafletsResumed: number
   pagesExtracted: number
   pagesFailed: number
   offersCreated: number
@@ -57,7 +58,8 @@ export async function isStale(
 export async function runScan(deps: ScanDeps): Promise<ScanStats> {
   const { db, source, client, storageDir, now } = deps
   const stats: ScanStats = {
-    leafletsSeen: 0, leafletsNew: 0, pagesExtracted: 0, pagesFailed: 0,
+    leafletsSeen: 0, leafletsNew: 0, leafletsResumed: 0,
+    pagesExtracted: 0, pagesFailed: 0,
     offersCreated: 0, tokensIn: 0, tokensOut: 0, costUsd: 0, capped: false,
   }
 
@@ -79,16 +81,51 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
     let newestSeen = cursor?.lastSeenDate ?? null
     let pageBudget = deps.maxPages
 
-    for (const d of discovered) {
+    // Leaflets we have already stored but not finished — because a previous run
+    // hit the page cap, a page failed, or `reparse` cleared them. Discovery will
+    // never return these again (the cursor has moved past their publication
+    // date), so they are resumed from the database instead.
+    const unfinished = await db
+      .select({
+        id: leaflets.id, externalId: leaflets.externalId, pdfUrl: leaflets.pdfUrl,
+        publishedAt: leaflets.publishedAt, shopSlug: shops.slug,
+      })
+      .from(leaflets)
+      .innerJoin(shops, eq(shops.id, leaflets.shopId))
+      .where(sql`${leaflets.status} <> 'done'`)
+
+    const work: Array<{ leafletId: string | null; d: typeof discovered[number] }> = [
+      ...unfinished.map((u) => ({
+        leafletId: u.id,
+        d: {
+          shopSlug: u.shopSlug, externalId: u.externalId, pdfUrl: u.pdfUrl,
+          publishedAt: u.publishedAt, coverUrl: null,
+        },
+      })),
+      ...discovered
+        .filter((d) => !unfinished.some(
+          (u) => u.shopSlug === d.shopSlug && u.externalId === d.externalId,
+        ))
+        .map((d) => ({ leafletId: null, d })),
+    ]
+    stats.leafletsResumed = unfinished.length
+
+    for (const item of work) {
+      const d = item.d
       const shopId = shopIdBySlug.get(d.shopSlug)
       if (!shopId) continue
-      if (!newestSeen || d.publishedAt > newestSeen) newestSeen = d.publishedAt
+      // Only discovery advances the cursor; resumed leaflets are already behind it.
+      if (item.leafletId === null && (!newestSeen || d.publishedAt > newestSeen)) {
+        newestSeen = d.publishedAt
+      }
 
-      const [known] = await db
-        .select({ id: leaflets.id })
-        .from(leaflets)
-        .where(and(eq(leaflets.shopId, shopId), eq(leaflets.externalId, d.externalId)))
-        .limit(1)
+      const [known] = item.leafletId
+        ? [{ id: item.leafletId }]
+        : await db
+            .select({ id: leaflets.id })
+            .from(leaflets)
+            .where(and(eq(leaflets.shopId, shopId), eq(leaflets.externalId, d.externalId)))
+            .limit(1)
 
       let leafletId: string
       let pdfPath: string

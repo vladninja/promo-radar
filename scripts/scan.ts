@@ -16,7 +16,9 @@ try {
   })
   console.log(JSON.stringify(stats))
 
-  if (await isStale(db, new Date(), config.staleHours)) {
+  // A capped run stops early on purpose, so the cursor still points at the
+  // backlog rather than at the newest leaflet. That is not a stale source.
+  if (!stats.capped && await isStale(db, new Date(), config.staleHours)) {
     console.error(
       `No new leaflets for over ${config.staleHours}h — the source may have changed.`,
     )
