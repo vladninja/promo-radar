@@ -1,0 +1,12 @@
+services:
+  db:
+    image: postgres:17-alpine
+    ports: ["55432:5432"]
+    environment:
+      POSTGRES_USER: promo
+      POSTGRES_PASSWORD: promo
+      POSTGRES_DB: promo_radar
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+volumes:
+  pgdata:
