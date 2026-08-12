@@ -20,23 +20,39 @@ describe.runIf(process.env.SMOKE === '1')('live vision smoke', () => {
   }, 180_000)
 })
 
-describe.runIf(existsSync(FIXTURE))('golden page result', () => {
-  const raw = JSON.parse(readFileSync(FIXTURE, 'utf8'))
+// Loaded lazily: a skipped describe still runs its factory during collection,
+// so reading the file at suite level would throw before the fixture exists.
+const loadFixture = () =>
+  PageResultSchema.parse(JSON.parse(readFileSync(FIXTURE, 'utf8')))
 
+describe('page schema', () => {
+  it('rejects a tile that is missing its bounding box', () => {
+    expect(() => PageResultSchema.parse({
+      page_date_badge: null,
+      issue_text: null,
+      tiles: [{
+        raw_name: 'x', brand: null, price: '1,00', price_before: null,
+        price_regular: null, discount_percent: null, promo_kind: 'price',
+        min_qty: null, unit_price_raw: null, requires_loyalty: false,
+        purchase_limit: null, date_badge: null,
+      }],
+    })).toThrow()
+  })
+})
+
+describe.runIf(existsSync(FIXTURE))('golden page result', () => {
   it('still satisfies the page schema', () => {
-    expect(() => PageResultSchema.parse(raw)).not.toThrow()
+    expect(() => loadFixture()).not.toThrow()
   })
 
   it('yields parseable prices for every plain-price tile', () => {
-    const page = PageResultSchema.parse(raw)
-    const priced = page.tiles.filter((t) => t.promo_kind === 'price')
+    const priced = loadFixture().tiles.filter((t) => t.promo_kind === 'price')
     expect(priced.length).toBeGreaterThan(0)
     for (const t of priced) expect(parseGrosze(t.price ?? '')).not.toBeNull()
   })
 
   it('keeps bbox values as fractions of the page', () => {
-    const page = PageResultSchema.parse(raw)
-    for (const t of page.tiles) {
+    for (const t of loadFixture().tiles) {
       for (const v of [t.bbox.x, t.bbox.y, t.bbox.w, t.bbox.h]) {
         expect(v).toBeGreaterThanOrEqual(0)
         expect(v).toBeLessThanOrEqual(1)
