@@ -46,6 +46,31 @@ docker-compose exec -T db psql -U promo -d promo_radar -c \
 6. **Match** — canonical key, then `pg_trgm` similarity within the same unit and
    ±5% size.
 
+## Web UI
+
+```bash
+pnpm dev     # http://localhost:3000
+```
+
+A single Hono server rendering JSX to HTML. No client JavaScript, no bundler —
+the screens are read-only and filters are a plain GET form.
+
+| Route | What it shows |
+|---|---|
+| `/` | Current promos. Filters: search, shop, cross-shop only, needs-review. Sort by discount or unit price. |
+| `/products/<id>` | The same product across every shop promoting it now, with the cheapest unit price marked. |
+| `/leaflets/<id>?page=n` | The source page image with offer boxes overlaid — the fastest way to check a parse. |
+| `/api/promos`, `/api/products/<id>` | JSON for the first two. |
+
+Prices marked **z kartą** require the shop's loyalty card, so they are not
+comparable to a plain shelf price. "Najtaniej" is decided on the normalized unit
+price and only among offers sharing the same basis (per kg, per l, or per piece),
+so a per-piece price never wins against a per-kilogram one.
+
+The cross-shop view only has something to show once two different shops promote
+the same product, which needs a few days of scans across Biedronka, Lidl and
+Kaufland.
+
 ## Costs
 
 Vision is the only recurring cost: about 150–250 pages a week at roughly
