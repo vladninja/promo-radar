@@ -31,7 +31,7 @@ describe('parseMediaItems', () => {
       externalId: '1',
       pdfUrl: 'https://www.gazetkipromocyjne.net/wp-content/uploads/pdf/0__abc.pdf',
       publishedAt: new Date('2026-08-12T10:17:04'),
-      coverUrl: null,
+      coverUrl: null, validFrom: null, validTo: null, pageCount: null,
     }])
   })
 

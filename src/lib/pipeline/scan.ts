@@ -10,7 +10,7 @@ import { pageCount } from '@/lib/acquire/rasterize'
 import {
   fallbackLeafletRange, parseDateBadge, parseIssueYear, resolveDates,
 } from '@/lib/extract/dates'
-import { extractPage, type VisionClient } from '@/lib/extract/vision'
+import { extractPage, type PageResult, type VisionClient } from '@/lib/extract/vision'
 import { attachToProduct } from '@/lib/match/attach'
 import { coreName } from '@/lib/normalize/canonical'
 import { parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
@@ -34,6 +34,7 @@ export interface ScanStats {
   leafletsNew: number
   leafletsResumed: number
   pagesExtracted: number
+  pagesReused: number
   pagesFailed: number
   offersCreated: number
   tokensIn: number
@@ -63,7 +64,7 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
   const stats: ScanStats = {
     leafletsSeen: 0, leafletsSkippedOld: 0, leafletsSkippedExpired: 0,
     leafletsNew: 0, leafletsResumed: 0,
-    pagesExtracted: 0, pagesFailed: 0,
+    pagesExtracted: 0, pagesReused: 0, pagesFailed: 0,
     offersCreated: 0, tokensIn: 0, tokensOut: 0, costUsd: 0, capped: false,
   }
 
@@ -86,7 +87,12 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       now().getTime() - deps.maxLeafletAgeDays * 24 * 3600 * 1000,
     )
     const discovered = all
-      .filter((d) => d.publishedAt >= ageCutoff)
+      .filter((d) => {
+        // Real validity dates from the shop listing page win: a leaflet whose
+        // promotions have ended is skipped before a single page is downloaded.
+        if (d.validTo) return d.validTo >= now()
+        return d.publishedAt >= ageCutoff
+      })
       .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
 
     stats.leafletsSeen = discovered.length
@@ -104,8 +110,9 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
     const unfinishedAll = await db
       .select({
         id: leaflets.id, externalId: leaflets.externalId, pdfUrl: leaflets.pdfUrl,
-        publishedAt: leaflets.publishedAt, validTo: leaflets.validTo,
-        shopSlug: shops.slug,
+        publishedAt: leaflets.publishedAt,
+        validFrom: leaflets.validFrom, validTo: leaflets.validTo,
+        pageCount: leaflets.pageCount, shopSlug: shops.slug,
       })
       .from(leaflets)
       .innerJoin(shops, eq(shops.id, leaflets.shopId))
@@ -123,6 +130,7 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
         d: {
           shopSlug: u.shopSlug, externalId: u.externalId, pdfUrl: u.pdfUrl,
           publishedAt: u.publishedAt, coverUrl: null,
+          validFrom: u.validFrom, validTo: u.validTo, pageCount: u.pageCount,
         },
       })),
       ...discovered
@@ -167,6 +175,7 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
           .values({
             shopId, externalId: d.externalId, sourceSlug: source.slug,
             pdfUrl: d.pdfUrl, publishedAt: d.publishedAt,
+            validFrom: d.validFrom, validTo: d.validTo,
             fileHash: asset.sha256, pageCount: await pageCount(asset.path),
           })
           .returning({ id: leaflets.id })
@@ -176,7 +185,11 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
 
       const [leaflet] = await db
         .select().from(leaflets).where(eq(leaflets.id, leafletId)).limit(1)
-      const leafletRange = fallbackLeafletRange(leaflet!.publishedAt)
+      // Prefer the source's own validity range over guessing a week from the
+      // publication date, so offers with no printed dates still get real ones.
+      const leafletRange = leaflet!.validFrom && leaflet!.validTo
+        ? { from: leaflet!.validFrom, to: leaflet!.validTo }
+        : fallbackLeafletRange(leaflet!.publishedAt)
       const pageDir = join(storageDir, 'pages', leafletId)
       await mkdir(pageDir, { recursive: true })
 
@@ -196,7 +209,19 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
         const outcome = await extractPage({
           client, pdfPath, pageNo, outDir: pageDir,
           model: config.visionModel, escalationModel: config.visionModelEscalation,
+          async reuse(imageHash) {
+            const [hit] = await db
+              .select({ rawJson: leafletPages.rawJson })
+              .from(leafletPages)
+              .where(and(
+                eq(leafletPages.imageHash, imageHash),
+                eq(leafletPages.status, 'done'),
+              ))
+              .limit(1)
+            return (hit?.rawJson as PageResult | undefined) ?? null
+          },
         })
+        if (outcome.reused) stats.pagesReused++
         stats.tokensIn += outcome.tokensIn
         stats.tokensOut += outcome.tokensOut
         stats.costUsd += costUsd(outcome.tokensIn, outcome.tokensOut, config.visionModel)
@@ -280,9 +305,17 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
         .where(eq(leafletPages.leafletId, leafletId))
 
       const complete = Number(agg!.total) === leaflet!.pageCount
+      // The publisher's own range wins when we have it. Deriving from page
+      // headers would narrow a 12.08-19.08 leaflet to whichever 3-day
+      // sub-period happened to be printed on the pages parsed so far.
+      const fromSource = leaflet!.validFrom !== null && leaflet!.validTo !== null
       await db.update(leaflets).set({
-        validFrom: agg!.from ? new Date(agg!.from) : leafletRange.from,
-        validTo: agg!.to ? new Date(agg!.to) : leafletRange.to,
+        validFrom: fromSource
+          ? leaflet!.validFrom
+          : agg!.from ? new Date(agg!.from) : leafletRange.from,
+        validTo: fromSource
+          ? leaflet!.validTo
+          : agg!.to ? new Date(agg!.to) : leafletRange.to,
         status: !complete ? 'partial' : Number(agg!.failed) > 0 ? 'partial' : 'done',
       }).where(eq(leaflets.id, leafletId))
 

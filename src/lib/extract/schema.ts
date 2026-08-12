@@ -26,3 +26,55 @@ export const PageResultSchema = z.object({
 
 export type OfferTile = z.infer<typeof OfferTileSchema>
 export type PageResult = z.infer<typeof PageResultSchema>
+
+/**
+ * What the model is actually asked to emit. Two thirds of the cost of a page is
+ * output tokens, and most of that was field names repeated on every tile, so the
+ * wire format uses short keys and a positional bbox. It is mapped straight back
+ * to PageResult, which stays the shape everything downstream reads.
+ */
+export const WireTileSchema = z.object({
+  n: z.string(),                       // name, as printed
+  br: z.string().nullable(),           // brand
+  p: z.string().nullable(),            // price
+  pb: z.string().nullable(),           // price before the reduction
+  pr: z.string().nullable(),           // regular / non-promotional price
+  d: z.number().int().nullable(),      // discount percent
+  k: z.enum(['price', 'percent', 'multibuy', 'bogo']),
+  q: z.number().int().nullable(),      // minimum quantity
+  u: z.string().nullable(),            // unit price, as printed
+  l: z.boolean(),                      // loyalty card required
+  lim: z.string().nullable(),          // purchase limit
+  dt: z.string().nullable(),           // dates only, e.g. "12.08-14.08"
+  b: z.array(z.number()).length(4),    // bbox: x, y, w, h
+})
+
+export const WirePageSchema = z.object({
+  pd: z.string().nullable(),           // page-level date range
+  iss: z.string().nullable(),          // issue marking, e.g. "NR 33/2026"
+  t: z.array(WireTileSchema),
+})
+
+export type WirePage = z.infer<typeof WirePageSchema>
+
+export function toPageResult(w: WirePage): PageResult {
+  return {
+    page_date_badge: w.pd,
+    issue_text: w.iss,
+    tiles: w.t.map((t) => ({
+      raw_name: t.n,
+      brand: t.br,
+      price: t.p,
+      price_before: t.pb,
+      price_regular: t.pr,
+      discount_percent: t.d,
+      promo_kind: t.k,
+      min_qty: t.q,
+      unit_price_raw: t.u,
+      requires_loyalty: t.l,
+      purchase_limit: t.lim,
+      date_badge: t.dt,
+      bbox: { x: t.b[0]!, y: t.b[1]!, w: t.b[2]!, h: t.b[3]! },
+    })),
+  }
+}

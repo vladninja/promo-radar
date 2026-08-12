@@ -30,7 +30,7 @@ const fakeSource: LeafletSource = {
       externalId: '113166',
       pdfUrl: 'https://example.test/a.pdf',
       publishedAt: new Date('2026-08-12T10:17:04Z'),
-      coverUrl: null,
+      coverUrl: null, validFrom: null, validTo: null, pageCount: null,
     }]
   },
   async fetchAsset(_l, destDir) {
@@ -82,7 +82,7 @@ function sourceWithDates(dates: string[]): LeafletSource {
         externalId: `L${i}`,
         pdfUrl: 'https://example.test/a.pdf',
         publishedAt: new Date(date),
-        coverUrl: null,
+        coverUrl: null, validFrom: null, validTo: null, pageCount: null,
       }))
     },
     async fetchAsset(l, destDir) {
@@ -195,6 +195,69 @@ describe('runScan', () => {
     expect(stats.leafletsNew).toBe(1)
     const rows = await db.select().from(leaflets)
     expect(rows.map((r) => r.externalId)).toEqual(['L2'])
+  })
+
+  it('never downloads a leaflet whose validity has already ended', async () => {
+    const c = { calls: 0 }
+    let downloads = 0
+    const dated: LeafletSource = {
+      ...fakeSource,
+      async discover() {
+        return [
+          {
+            shopSlug: 'biedronka', externalId: 'EXPIRED',
+            pdfUrl: 'https://example.test/a.pdf',
+            publishedAt: new Date('2026-08-11T00:00:00Z'),   // published recently
+            coverUrl: null,
+            validFrom: new Date('2026-08-01T00:00:00Z'),
+            validTo: new Date('2026-08-05T23:59:59Z'),        // but already over
+            pageCount: 84,
+          },
+          {
+            shopSlug: 'biedronka', externalId: 'CURRENT',
+            pdfUrl: 'https://example.test/b.pdf',
+            publishedAt: new Date('2026-08-10T00:00:00Z'),
+            coverUrl: null,
+            validFrom: new Date('2026-08-12T00:00:00Z'),
+            validTo: new Date('2026-08-19T23:59:59Z'),
+            pageCount: 2,
+          },
+        ]
+      },
+      async fetchAsset(l, destDir) {
+        downloads++
+        await mkdir(join(destDir, 'biedronka'), { recursive: true })
+        const path = join(destDir, 'biedronka', `${l.externalId}.pdf`)
+        await copyFile('tests/fixtures/leaflet-2pages.pdf', path)
+        return { path, sha256: `h-${l.externalId}` }
+      },
+    }
+
+    const stats = await runScan({ ...deps(c), source: dated })
+    expect(stats.leafletsSkippedOld).toBe(1)
+    expect(downloads).toBe(1)                    // the expired one never fetched
+    const rows = await db.select().from(leaflets)
+    expect(rows.map((r) => r.externalId)).toEqual(['CURRENT'])
+    // The source's own dates are stored, not a guess from the publication date.
+    expect(rows[0]!.validTo!.toISOString().slice(0, 10)).toBe('2026-08-19')
+  })
+
+  it('reuses an identical page instead of paying for it twice', async () => {
+    const c = { calls: 0 }
+    // Two leaflets built from the same PDF, so their page images are identical.
+    const stats = await runScan({
+      ...deps(c),
+      source: sourceWithDates([
+        '2026-08-10T00:00:00Z',
+        '2026-08-11T00:00:00Z',
+      ]),
+    })
+
+    expect(stats.leafletsNew).toBe(2)
+    expect(c.calls).toBe(2)                 // 4 pages, only 2 actually parsed
+    expect(stats.pagesReused).toBe(2)
+    expect(stats.pagesExtracted).toBe(4)    // all four pages still recorded
+    expect(await db.select().from(offers)).toHaveLength(4)
   })
 
   it('spends its budget on the newest leaflet first', async () => {

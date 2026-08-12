@@ -7,6 +7,50 @@ import type { DiscoveredLeaflet, LeafletSource } from '@/lib/sources/types'
 
 const SHOP_FROM_LINK = /^https?:\/\/[^/]+\/([^/]+)\/attachment\//
 
+/**
+ * The shop listing page carries what the media API does not: each leaflet's
+ * validity range, and often its page count. Both sit in the same markup as the
+ * PDF link — the download anchor names the dates, and the viewer iframe carries
+ * `?pages=N&id=…` — so no DOM walking is needed to pair them.
+ *
+ * This is what makes it possible to skip an expired leaflet before paying to
+ * download and parse 60-90 pages of it.
+ */
+const DOWNLOAD_ANCHOR =
+  /download="[^"]*?od (\d{2})\/(\d{2})\/(\d{4}) do (\d{2})\/(\d{2})\/(\d{4})[^"]*?"\s+href="[^"]*?uploads\/pdf\/([a-z0-9_]+)\.pdf"/g
+const VIEWER_IFRAME = /\?pages=(\d+)&(?:amp;)?id=([a-z0-9_]+)/g
+
+export interface ShopLeafletMeta {
+  validFrom: Date
+  validTo: Date
+  pageCount: number | null
+}
+
+export function pdfIdFromUrl(url: string): string | null {
+  const m = url.match(/\/([a-z0-9_]+)\.pdf(?:$|[?#])/)
+  return m ? m[1]! : null
+}
+
+export function parseShopMeta(html: string): Map<string, ShopLeafletMeta> {
+  const pages = new Map<string, number>()
+  for (const m of html.matchAll(VIEWER_IFRAME)) {
+    pages.set(m[2]!, Number(m[1]))
+  }
+
+  const out = new Map<string, ShopLeafletMeta>()
+  for (const m of html.matchAll(DOWNLOAD_ANCHOR)) {
+    const [, d1, m1, y1, d2, m2, y2, id] = m
+    out.set(id!, {
+      validFrom: new Date(Date.UTC(Number(y1), Number(m1) - 1, Number(d1))),
+      // The printed end date is inclusive, so a leaflet valid "do 19/08" is
+      // still current all through the 19th.
+      validTo: new Date(Date.UTC(Number(y2), Number(m2) - 1, Number(d2), 23, 59, 59)),
+      pageCount: pages.get(id!) ?? null,
+    })
+  }
+  return out
+}
+
 export function parseMediaItems(
   items: unknown[],
   allowlist: readonly string[],
@@ -30,12 +74,26 @@ export function parseMediaItems(
       pdfUrl: it.source_url,
       publishedAt: new Date(it.date),
       coverUrl: it.media_details?.sizes?.full?.source_url ?? null,
+      validFrom: null,
+      validTo: null,
+      pageCount: null,
     })
   }
   return out
 }
 
 const limit = createRateLimiter(1000)
+
+async function getText(url: string): Promise<string | null> {
+  try {
+    const res = await limit(() =>
+      fetch(url, { headers: { 'User-Agent': config.userAgent } }),
+    )
+    return res.ok ? await res.text() : null
+  } catch {
+    return null
+  }
+}
 
 async function getJson(url: string): Promise<unknown[]> {
   const res = await limit(() =>
@@ -69,6 +127,24 @@ export const gazetkiSource: LeafletSource = {
       )
       found.push(...parseMediaItems(items, shopSlugs))
       if (items.length < 100) break
+    }
+
+    // One listing page per shop supplies validity dates and page counts. If a
+    // page is unreachable or its markup changes, discovery still works — the
+    // leaflet simply falls back to the publication-age rule.
+    for (const slug of new Set(found.map((f) => f.shopSlug))) {
+      const html = await getText(`${config.sourceBaseUrl}/${slug}/`)
+      if (!html) continue
+      const meta = parseShopMeta(html)
+      for (const leaflet of found) {
+        if (leaflet.shopSlug !== slug) continue
+        const id = pdfIdFromUrl(leaflet.pdfUrl)
+        const m = id ? meta.get(id) : undefined
+        if (!m) continue
+        leaflet.validFrom = m.validFrom
+        leaflet.validTo = m.validTo
+        leaflet.pageCount = m.pageCount
+      }
     }
     return found
   },

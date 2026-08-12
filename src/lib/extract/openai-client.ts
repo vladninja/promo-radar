@@ -3,7 +3,7 @@ import OpenAI from 'openai'
 import { zodTextFormat } from 'openai/helpers/zod'
 import { config } from '@/lib/config'
 import { buildPrompt } from '@/lib/extract/prompt'
-import { PageResultSchema } from '@/lib/extract/schema'
+import { WirePageSchema, toPageResult } from '@/lib/extract/schema'
 import type { VisionClient } from '@/lib/extract/vision'
 
 export function createOpenAiVisionClient(): VisionClient {
@@ -22,11 +22,11 @@ export function createOpenAiVisionClient(): VisionClient {
             { type: 'input_image', image_url: `data:image/jpeg;base64,${b64}`, detail: 'high' },
           ],
         }],
-        text: { format: zodTextFormat(PageResultSchema, 'page') },
+        text: { format: zodTextFormat(WirePageSchema, 'page') },
       })
       if (!res.output_parsed) throw new Error('vision returned no parsed output')
       return {
-        result: res.output_parsed,
+        result: toPageResult(res.output_parsed),
         tokensIn: res.usage?.input_tokens ?? 0,
         tokensOut: res.usage?.output_tokens ?? 0,
       }

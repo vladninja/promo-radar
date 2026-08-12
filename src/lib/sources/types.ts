@@ -4,6 +4,11 @@ export interface DiscoveredLeaflet {
   pdfUrl: string
   publishedAt: Date
   coverUrl: string | null
+  /** From the shop listing page when available, so expired leaflets can be
+   *  skipped before anything is downloaded or parsed. */
+  validFrom: Date | null
+  validTo: Date | null
+  pageCount: number | null
 }
 
 export interface LeafletSource {

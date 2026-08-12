@@ -73,10 +73,26 @@ Kaufland.
 
 ## Costs
 
-Vision is the only recurring cost: about 150–250 pages a week at roughly
-$0.002 a page on `gpt-5.6-luna`, so a few dollars a month. `MAX_PAGES_PER_RUN`
-(default 400) is a hard ceiling per run; per-run token use and USD cost land in
-the `job_runs` table.
+Vision is the only recurring cost: roughly **$0.0021 a page** on `gpt-5.6-luna`,
+so a few dollars a month. `MAX_PAGES_PER_RUN` (default 400) is a hard ceiling
+per run; per-run token use and USD cost land in the `job_runs` table.
+
+About two thirds of a page's cost is **output** tokens, not the image, so the
+savings target the JSON coming back:
+
+| Measure | Effect |
+|---|---|
+| Terse wire schema — short keys, positional bbox, dates only | −17% output tokens, −12% total (measured on identical pages) |
+| Skip leaflets already expired, using dates from the shop listing page | Avoids whole leaflets: 40–95 pages, $0.08–0.20 each |
+| Reuse pages by image hash | A republished page is never billed twice |
+| Only leaflets that can still be current | `MAX_LEAFLET_AGE_DAYS` (default 14), used when the listing page gives no dates |
+
+The model emits short keys (`n`, `p`, `pb`, `dt`, `b`…) which
+`toPageResult()` maps back to the readable shape everything else uses, so the
+saving is invisible outside `extract/`.
+
+Still on the table: the OpenAI **Batch API** is 50% off and fits a nightly cron,
+at the cost of a submit/collect state machine and up to 24h latency.
 
 Pages that come back empty or with a priced tile missing its price are retried
 once as two overlapping halves on `gpt-5.6-terra`. Only those pages cost double.

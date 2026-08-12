@@ -17,6 +17,8 @@ interface OutcomeBase {
   splitRetry: boolean
   imagePath: string
   imageHash: string
+  /** True when the result came from an identical page already parsed. */
+  reused?: boolean
 }
 
 export type ExtractOutcome =
@@ -38,6 +40,10 @@ export async function extractPage(args: {
   outDir: string
   model?: string
   escalationModel?: string
+  /** Returns an already-parsed result for an identical page image, if one
+   *  exists. Shops republish the same page under new leaflet ids, and paying
+   *  twice for identical pixels is pure waste. */
+  reuse?: (imageHash: string) => Promise<PageResult | null>
 }): Promise<ExtractOutcome> {
   const { client, pdfPath, pageNo, outDir } = args
   const model = args.model ?? 'gpt-5.6-luna'
@@ -51,6 +57,15 @@ export async function extractPage(args: {
     const whole = await renderPage(pdfPath, pageNo, outDir)
     imagePath = whole.path
     imageHash = whole.sha256
+
+    const reused = args.reuse ? await args.reuse(whole.sha256) : null
+    if (reused) {
+      return {
+        status: 'done', result: reused, reused: true,
+        tokensIn: 0, tokensOut: 0, splitRetry: false, imagePath, imageHash,
+      }
+    }
+
     const first = await client.parsePage(whole.path, model)
     tokensIn += first.tokensIn
     tokensOut += first.tokensOut
