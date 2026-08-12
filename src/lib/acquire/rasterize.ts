@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { mkdir, readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -39,6 +39,7 @@ export async function renderPage(
   outDir: string,
   dpi = DEFAULT_DPI,
 ): Promise<{ path: string; sha256: string }> {
+  await mkdir(outDir, { recursive: true })
   const prefix = join(outDir, `p${pageNo}`)
   await run('pdftoppm', [
     '-f', String(pageNo), '-l', String(pageNo),
@@ -55,6 +56,7 @@ export async function renderHalves(
   outDir: string,
   dpi = DEFAULT_DPI,
 ): Promise<Array<{ path: string; sha256: string }>> {
+  await mkdir(outDir, { recursive: true })
   const { width, height } = await pageSizePx(pdfPath, dpi)
   const overlap = Math.round(height * 0.1)
   const windows = [
