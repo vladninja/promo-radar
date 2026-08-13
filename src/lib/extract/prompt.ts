@@ -25,7 +25,9 @@ Keys are deliberately short. Emit exactly these per tile:
 - u: a per-unit price only when a NUMBER and a unit are printed together, e.g. "0,80 zł/100 g" or "1,50 zł/rolka". A bare unit label printed beside the main price, such as "zł/szt." or "zł/zest.", is not a unit price — return null for those.
 - l: true when the tile carries a loyalty badge such as "Z KARTĄ", "Z KARTĄ LUB APKĄ", "Moja Biedronka", "Lidl Plus".
 - lim: the numeric part of any purchase limit, e.g. "3 szt./dzień" for "Limit dzienny 3 szt. na kartę Moja Biedronka". Keep it under 20 characters. Null when there is no limit.
-- dt: ONLY the dates from the tile's validity text, in the form "12.08-14.08". Write nothing else — no "OFERTA", no "Oferta ważna", no year, no "do wyczerpania zapasów". Copy both dates exactly; never repeat the start date as the end date. Null if the tile shows no dates.
+- dt: ONLY the dates from the tile's validity text, in the form "12.08-14.08".
+    If only a start is printed — "OD ŚRODY 12.08" — return "od 12.08"; it means
+    from that day until the leaflet ends, and dropping it back-dates the offer. Write nothing else — no "OFERTA", no "Oferta ważna", no year, no "do wyczerpania zapasów". Copy both dates exactly; never repeat the start date as the end date. Null if the tile shows no dates.
 - b: the tile's bounding box as exactly four numbers [x, y, w, h], each a fraction of page width or height between 0 and 1.
 
 Page-level keys:

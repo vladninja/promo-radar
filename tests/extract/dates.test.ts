@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  parseIssueYear, parseDateBadge, resolveDates, fallbackLeafletRange,
+  parseIssueYear, parseDateBadge, parseBadgeWithin, resolveDates,
+  fallbackLeafletRange,
 } from '@/lib/extract/dates'
 
 describe('parseIssueYear', () => {
@@ -30,6 +31,35 @@ describe('parseDateBadge', () => {
   })
   it('returns null when there are no dates', () => {
     expect(parseDateBadge('1+1 GRATIS', 2026)).toBeNull()
+  })
+})
+
+describe('parseBadgeWithin', () => {
+  const leafletTo = new Date(Date.UTC(2026, 7, 19, 23, 59, 59))
+
+  it('runs a start-only badge to the end of the leaflet', () => {
+    const r = parseBadgeWithin('OD ŚRODY 12.08', 2026, leafletTo)!
+    expect(r.from.toISOString().slice(0, 10)).toBe('2026-08-12')
+    expect(r.to).toEqual(leafletTo)
+  })
+
+  it('does not back-date to the leaflet start', () => {
+    // Leaflet began on the 6th; this page's offers begin on the 12th.
+    const r = parseBadgeWithin('OD ŚRODY 12.08', 2026, leafletTo)!
+    expect(r.from > new Date(Date.UTC(2026, 7, 6))).toBe(true)
+  })
+
+  it('still prefers an explicit two-date range', () => {
+    const r = parseBadgeWithin('OFERTA OD 12.08 DO 14.08', 2026, leafletTo)!
+    expect(r.to.toISOString().slice(0, 10)).toBe('2026-08-14')
+  })
+
+  it('ignores a start that falls after the leaflet has ended', () => {
+    expect(parseBadgeWithin('OD 25.09', 2026, leafletTo)).toBeNull()
+  })
+
+  it('returns null when there is no date', () => {
+    expect(parseBadgeWithin('SUPERCENA', 2026, leafletTo)).toBeNull()
   })
 })
 

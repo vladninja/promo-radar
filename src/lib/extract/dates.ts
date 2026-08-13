@@ -23,6 +23,24 @@ export function parseDateBadge(text: string, anchorYear: number): DateRange | nu
   return { from, to }
 }
 
+/**
+ * A badge that names only a start — "OD ŚRODY 12.08" — means the offer runs from
+ * that day to the end of the leaflet. Without this, such a page inherits the
+ * leaflet's start too, back-dating offers that had not begun yet.
+ */
+export function parseBadgeWithin(
+  text: string,
+  anchorYear: number,
+  leafletTo: Date,
+): DateRange | null {
+  const both = parseDateBadge(text, anchorYear)
+  if (both) return both
+  const m = text.match(/\bod\b[^0-9]{0,24}(\d{1,2})[.,](\d{1,2})(?!\s*[.,]?\s*\d)/i)
+  if (!m) return null
+  const from = new Date(Date.UTC(anchorYear, Number(m[2]) - 1, Number(m[1])))
+  return from <= leafletTo ? { from, to: leafletTo } : null
+}
+
 export function resolveDates(
   offer: DateRange | null,
   page: DateRange | null,

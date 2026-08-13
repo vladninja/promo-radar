@@ -1,7 +1,7 @@
 import type { Db } from '@/lib/db/client'
 import { leafletPages, offers } from '@/lib/db/schema'
 import {
-  parseDateBadge, parseIssueYear, resolveDates, type DateRange,
+  parseBadgeWithin, parseIssueYear, resolveDates, type DateRange,
 } from '@/lib/extract/dates'
 import type { PageResult } from '@/lib/extract/vision'
 import { attachToProduct } from '@/lib/match/attach'
@@ -43,7 +43,7 @@ export async function persistPageResult(
   const year =
     parseIssueYear(result.issue_text ?? '') ?? args.publishedAt.getUTCFullYear()
   const pageRange = result.page_date_badge
-    ? parseDateBadge(result.page_date_badge, year)
+    ? parseBadgeWithin(result.page_date_badge, year, leafletRange.to)
     : null
 
   await db.insert(leafletPages).values({
@@ -58,7 +58,7 @@ export async function persistPageResult(
   let offersCreated = 0
   for (const tile of result.tiles) {
     const offerRange = tile.date_badge
-      ? parseDateBadge(tile.date_badge, year)
+      ? parseBadgeWithin(tile.date_badge, year, leafletRange.to)
       : null
     const { range, source: dateSrc } = resolveDates(
       offerRange, pageRange, leafletRange,
