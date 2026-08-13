@@ -169,9 +169,15 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   font-variant-numeric: tabular-nums; margin-right: .5rem;
 }
 .unit-big { margin: 0; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
-.verdict { margin: .25rem 0 0; font-size: 13px; font-weight: 550; }
-.verdict.good { color: #166534; }
-.verdict.bad { color: #9f1239; }
+.verdict {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  margin: .5rem 0 0; padding: .5rem .75rem; font-size: 13px; font-weight: 600;
+  border-radius: calc(var(--radius) - 2px); border: 1px solid transparent;
+}
+.verdict.good { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+.verdict.bad { color: #fff; background: var(--accent); border-color: #a20d25; }
+a.verdict.bad:hover { text-decoration: none; background: #a20d25; }
+.verdict .go { white-space: nowrap; opacity: .95; font-weight: 650; }
 .facts {
   display: grid; grid-template-columns: auto 1fr; gap: .375rem 1rem;
   margin: 0; font-size: 13px;
@@ -187,8 +193,28 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* Sideways browsing */
 .strip-wrap { margin-bottom: 1.75rem; }
 .strip-wrap h2 {
+  display: flex; align-items: center; gap: .5rem;
   font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 .625rem;
 }
+.strip-wrap .count {
+  font-size: 11px; font-weight: 650; color: var(--muted-fg);
+  border: 1px solid var(--border); border-radius: 9999px; padding: 0 .4rem;
+}
+/* The cross-shop strip is the reason the app exists: give it a panel of its own
+   so it cannot be mistaken for the "you might also like" row below it. */
+.strip-wrap.primary {
+  background: var(--card); border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius); padding: 1rem; margin-bottom: 1.5rem;
+}
+.strip-wrap.primary h2 { font-size: 1.1rem; }
+.strip-wrap.primary .count {
+  background: var(--accent); color: #fff; border-color: var(--accent);
+}
+.strip-wrap.primary .dot {
+  width: .5rem; height: .5rem; border-radius: 9999px; background: var(--accent);
+}
+.strip-wrap.primary .mini { border-color: var(--border); background: var(--bg); }
 .sub-inline { font-weight: 400; font-size: 12px; color: var(--muted-fg); margin-left: .5rem; }
 .strip {
   display: grid; grid-auto-flow: column; grid-auto-columns: 168px; gap: .625rem;

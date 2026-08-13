@@ -3,12 +3,19 @@ import { formatPromo, formatRange, formatUnitPrice, formatZl } from '@/lib/forma
 import { CATEGORY_LABELS } from '@/lib/normalize/category'
 import type { PromoDetail, RelatedPromo } from '@/lib/queries/promo'
 
-function Strip(props: { title: string; note?: string; items: RelatedPromo[] }) {
+function Strip(props: {
+  title: string
+  note?: string
+  items: RelatedPromo[]
+  primary?: boolean
+}) {
   if (props.items.length === 0) return null
   return (
-    <section class="strip-wrap">
+    <section class={props.primary ? 'strip-wrap primary' : 'strip-wrap'}>
       <h2>
+        {props.primary ? <span class="dot" /> : null}
         {props.title}
+        <span class="count">{props.items.length}</span>
         {props.note ? <span class="sub-inline">{props.note}</span> : null}
       </h2>
       <div class="strip">
@@ -85,12 +92,17 @@ export function PromoView(props: {
               <p class="unit-big">{formatUnitPrice(p.unitPriceGrosze, p.unitBasis)}</p>
             ) : null}
             {beatsAll === true ? (
-              <p class="verdict good">Najtańsza z porównywanych ofert</p>
+              <p class="verdict good">✓ Najtańsza z porównywanych ofert</p>
             ) : beatsAll === false && cheapestElsewhere ? (
-              <p class="verdict bad">
-                Taniej w {cheapestElsewhere.shopSlug}:{' '}
-                {formatUnitPrice(cheapestElsewhere.unitPriceGrosze, cheapestElsewhere.unitBasis)}
-              </p>
+              <a class="verdict bad" href={`/promos/${cheapestElsewhere.offerId}`}>
+                <span>
+                  Taniej w <strong>{cheapestElsewhere.shopSlug}</strong>:{' '}
+                  <strong>
+                    {formatUnitPrice(cheapestElsewhere.unitPriceGrosze, cheapestElsewhere.unitBasis)}
+                  </strong>
+                </span>
+                <span class="go">Zobacz →</span>
+              </a>
             ) : null}
           </div>
 
@@ -120,8 +132,9 @@ export function PromoView(props: {
 
       <Strip
         title="Ta sama rzecz w innych sklepach"
-        note={props.elsewhere.length === 0 ? undefined : 'porównanie cen za jednostkę'}
+        note="porównanie cen za jednostkę"
         items={props.elsewhere}
+        primary
       />
       <Strip title={`Podobne: ${CATEGORY_LABELS[p.category]}`} items={props.similar} />
     </Layout>
