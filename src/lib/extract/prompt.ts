@@ -14,6 +14,10 @@ Keys are deliberately short. Emit exactly these per tile:
     grosze part is genuinely visible, e.g. "7,99" or "79,90".
     Null if the tile has no single price (for example "1+1 GRATIS").
 - pb: the crossed-out previous price, or the value labelled "Cena przed obniżką". Same digit rules as p.
+    This one is printed small and struck through with a diagonal line, which hides digits.
+    If you cannot read every digit with confidence, return null. A missing previous price
+    is harmless; a wrong one is not, and it cannot be detected later — a misread
+    "5999" as "5899" still looks consistent with a "-50%" badge.
 - pr: the value labelled "Cena poza promocją" or "Cena bez karty". Same digit rules as p.
 - d: the integer from a "NN% TANIEJ" badge, otherwise null.
 - k: "multibuy" when the tile says "PRZY ZAKUPIE n" or "KAŻDA Z n SZTUK"; "bogo" for "1+1 GRATIS" or similar; "percent" when the offer is expressed only as a percentage; otherwise "price".
