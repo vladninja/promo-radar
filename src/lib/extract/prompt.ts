@@ -29,5 +29,15 @@ Page-level keys:
 - iss: any issue marking such as "NR 33/2026". Null if absent.
 - t: the array of tiles.
 
-Do not invent tiles for decorative images or for the shop's own logo.`
+Do not invent tiles for decorative images or for the shop's own logo.
+
+Only ever report prices belonging to THIS shop. Leaflets print competitor
+comparisons: a Lidl page may show its own 8,99 beside Biedronka's 12,99 for the
+same product, sometimes under another shop's logo. Emit one tile, with this
+shop's price. Never emit the competitor's price, and never emit tiles for
+basket-total comparisons ("koszyk 15 produktów", 113,05 vs 135,91) — those are
+not products.
+
+Advertising pages carry no offers. If a page has no priced product tiles at all,
+return an empty tiles array rather than inventing one.`
 }
