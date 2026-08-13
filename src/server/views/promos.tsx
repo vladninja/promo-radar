@@ -1,5 +1,6 @@
 import { Layout } from '@/server/views/layout'
-import { formatPromo, formatRange, formatUnitPrice, formatZl } from '@/lib/format'
+import { formatUnitPrice, formatZl, promoKindLabel } from '@/lib/format'
+import { CrossShopIcon, LoyaltyIcon, ReviewIcon, ShopLogo } from '@/server/views/icons'
 import type { PromoFilters, PromoPage } from '@/lib/queries/promos'
 import { CATEGORIES, CATEGORY_LABELS } from '@/lib/normalize/category'
 
@@ -9,6 +10,10 @@ const SHOPS = [
   ['lidl', 'Lidl'],
   ['kaufland', 'Kaufland'],
 ] as const
+
+const SHOP_NAMES: Record<string, string> = Object.fromEntries(
+  SHOPS.filter(([slug]) => slug).map(([slug, label]) => [slug, label]),
+)
 
 export function PromosView(props: {
   result: PromoPage
@@ -30,7 +35,7 @@ export function PromosView(props: {
       <h1>Promocje</h1>
       <p class="sub">
         {total} promocji w {shops} sklepach
-        {crossShop > 0 ? ` · ${crossShop} na tej stronie w kilku sklepach` : ''}
+        {crossShop > 0 ? ` · ${crossShop} na tej stronie jest w kilku sklepach` : ''}
         {pages > 1 ? ` · strona ${page} z ${pages}` : ''}
       </p>
 
@@ -74,9 +79,14 @@ export function PromosView(props: {
             <a class="promo" href={`/promos/${r.offerId}`}>
               <div class="thumb">
                 <img src={`/api/crop/${r.offerId}`} alt="" loading="lazy" />
-                {r.discountPercent !== null
+                {/* A multibuy's percentage describes one item of a bundle, so
+                    printing "-100%" on the card promises something the offer
+                    does not. The chip below names the mechanic and the detail
+                    page states its terms. */}
+                {r.discountPercent !== null && r.promoKind !== 'multibuy'
                   ? <span class="disc">-{r.discountPercent}%</span>
                   : null}
+                <span class="mark"><ShopLogo slug={r.shopSlug} name={SHOP_NAMES[r.shopSlug]} /></span>
               </div>
               <div class="body">
                 <p class="pname">{r.rawName}</p>
@@ -85,20 +95,17 @@ export function PromosView(props: {
                   {r.unitPriceGrosze !== null
                     ? <span class="unit">{formatUnitPrice(r.unitPriceGrosze, r.unitBasis)}</span>
                     : null}
+                  <span class="icons">
+                    {r.shopCount > 1
+                      ? <CrossShopIcon title={`Ta sama rzecz w ${r.shopCount} sklepach`} />
+                      : null}
+                    {r.requiresLoyalty ? <LoyaltyIcon title="Cena z kartą sklepu" /> : null}
+                    {r.needsReview ? <ReviewIcon title="Odczyt do sprawdzenia" /> : null}
+                  </span>
                 </p>
                 <p class="tags">
-                  <span class="badge shop">{r.shopSlug}</span>
+                  <span class={`badge kind ${r.promoKind}`}>{promoKindLabel(r.promoKind)}</span>
                   <span class="badge cat">{CATEGORY_LABELS[r.category]}</span>
-                  {r.requiresLoyalty ? <span class="badge card-only">z kartą</span> : null}
-                  {r.shopCount > 1
-                    ? <span class="badge best">w {r.shopCount} sklepach</span>
-                    : null}
-                  {r.needsReview ? <span class="badge review">do sprawdzenia</span> : null}
-                </p>
-                <p class="meta">
-                  {formatPromo(r.promoKind, r.minQty, r.discountPercent)}
-                  {' · '}
-                  {formatRange(r.validFrom, r.validTo)}
                 </p>
               </div>
             </a>

@@ -68,22 +68,32 @@ describe('listPromos', () => {
   it('returns only offers valid now', async () => {
     const rows = await listPromos(db, { now: NOW })
     expect(rows.map((r) => r.rawName)).not.toContain('Stara promocja, 1 kg')
-    expect(rows).toHaveLength(3)
+    expect(rows).toHaveLength(2)   // the butter, once, and the bread
   })
 
   it('reports how many shops promote each product', async () => {
     const rows = await listPromos(db, { now: NOW })
     const butter = rows.filter((r) => r.rawName.startsWith('Masło'))
-    expect(butter).toHaveLength(2)
-    expect(butter.every((r) => r.shopCount === 2)).toBe(true)
+    expect(butter).toHaveLength(1)
+    expect(butter[0]!.shopCount).toBe(2)
     const bread = rows.find((r) => r.rawName.startsWith('Chleb'))!
     expect(bread.shopCount).toBe(1)
   })
 
+  it('shows one card for a product two shops are promoting, at the lower price', async () => {
+    const rows = await listPromos(db, { now: NOW, q: 'masło' })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.priceGrosze).toBe(199)      // Biedronka's, the cheaper
+    expect(rows[0]!.shopSlug).toBe('biedronka')
+    // Lidl's 9,00 zł/kg belongs to Lidl's 2,00: quoting it here would put a
+    // figure on the card that appears in neither leaflet.
+    expect(rows[0]!.unitPriceGrosze).toBe(800)
+  })
+
   it('filters to cross-shop products only', async () => {
     const rows = await listPromos(db, { now: NOW, crossShopOnly: true })
-    expect(rows).toHaveLength(2)
-    expect(rows.every((r) => r.rawName.startsWith('Masło'))).toBe(true)
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.rawName.startsWith('Masło')).toBe(true)
   })
 
   it('filters by shop', async () => {
@@ -93,14 +103,14 @@ describe('listPromos', () => {
   })
 
   it('searches by name, case-insensitively', async () => {
-    expect(await listPromos(db, { now: NOW, q: 'masło' })).toHaveLength(2)
-    expect(await listPromos(db, { now: NOW, q: 'MASŁO' })).toHaveLength(2)
+    expect(await listPromos(db, { now: NOW, q: 'masło' })).toHaveLength(1)
+    expect(await listPromos(db, { now: NOW, q: 'MASŁO' })).toHaveLength(1)
   })
 
-  it('sorts by unit price ascending', async () => {
-    const rows = await listPromos(db, { now: NOW, sort: 'unit', crossShopOnly: true })
+  it('sorts by unit price ascending, offers without one last', async () => {
+    const rows = await listPromos(db, { now: NOW, sort: 'unit' })
     expect(rows[0]!.unitPriceGrosze).toBe(800)
-    expect(rows[1]!.unitPriceGrosze).toBe(900)
+    expect(rows.at(-1)!.unitPriceGrosze).toBeNull()
   })
 
   it('sorts by discount descending by default', async () => {

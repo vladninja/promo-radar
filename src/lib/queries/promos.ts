@@ -53,9 +53,19 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
   if (f.foodOnly) where.push(inArray(offers.category, [...FOOD_CATEGORIES]))
   if (f.crossShopOnly) where.push(sql`${shopCount} > 1`)
 
+  // "Trzeci produkt 100% taniej" is not a 100% discount, it is a third off three
+  // items — but it is printed as 100, so sorting on the printed number put
+  // thirteen price-less bundles at the head of the list and every real bargain
+  // behind them. Spread a multibuy's headline over the bundle it applies to.
+  const effectiveDiscount = sql`case
+    when ${offers.promoKind} = 'multibuy' and coalesce(${offers.minQty}, 0) > 1
+      then ${offers.discountPercent}::numeric / ${offers.minQty}
+    else ${offers.discountPercent}::numeric
+  end`
+
   const order = f.sort === 'unit'
     ? sql`${offers.unitPriceGrosze} asc nulls last`
-    : sql`${offers.discountPercent} desc nulls last`
+    : sql`${effectiveDiscount} desc nulls last`
 
   const rows = await db
     .select({
@@ -86,18 +96,22 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
     // the tail of the list silently missing. Paging is done on merged rows.
     .limit(5000)
 
-  // A leaflet prints its headline offers on the cover and again in the section,
-  // so the same promotion arrives twice. That is one promotion, not two: merge on
-  // shop, identity, price, mechanic and dates, keeping the fuller printing.
+  // One card per product. A leaflet prints its headline offers on the cover and
+  // again in the section, and three shops promote the same yoghurt in the same
+  // week — to a shopper that is one thing to buy, not four. The cheapest offer
+  // represents it here and the detail page lists where else it is on.
+  //
+  // Offers the matcher could not identify keep a per-shop key: without a product
+  // there is nothing to say two of them are the same thing, and collapsing on the
+  // printed name alone would merge unrelated goods.
   const merged = new Map<string, PromoRow>()
   for (const r of rows) {
     const row: PromoRow = { ...r, shopCount: Number(r.shopCount) }
     // Loyalty is deliberately not part of the key: a shop quoting "z kartą 1,49"
     // beside "bez karty 1,99" is running one promotion, and listing both makes
     // the shop look like it competes with itself.
-    const key = [
-      row.shopSlug, row.productId ?? row.rawName,
-      row.promoKind, row.minQty ?? 'x',
+    const key = row.productId ?? [
+      row.shopSlug, row.rawName, row.promoKind, row.minQty ?? 'x',
       row.validFrom?.getTime() ?? 'x', row.validTo?.getTime() ?? 'x',
     ].join('|')
     const seen = merged.get(key)
@@ -109,9 +123,15 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
     const cheaper =
       (row.priceGrosze ?? Infinity) < (seen.priceGrosze ?? Infinity) ? row : seen
     const other = cheaper === row ? seen : row
-    cheaper.unitPriceGrosze ??= other.unitPriceGrosze
-    cheaper.unitBasis ??= other.unitBasis
-    cheaper.discountPercent ??= other.discountPercent
+    // Filling gaps from the other printing only makes sense within one shop,
+    // where both describe the same promotion. Another shop's unit price belongs
+    // to another shop's price, and copying it across would quote a figure that
+    // appears in no leaflet.
+    if (cheaper.shopSlug === other.shopSlug) {
+      cheaper.unitPriceGrosze ??= other.unitPriceGrosze
+      cheaper.unitBasis ??= other.unitBasis
+      cheaper.discountPercent ??= other.discountPercent
+    }
     cheaper.needsReview = cheaper.needsReview || other.needsReview
     merged.set(key, cheaper)
   }

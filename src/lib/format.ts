@@ -38,3 +38,22 @@ export function formatPromo(
     default: return 'cena promocyjna'
   }
 }
+
+/**
+ * One label per mechanic, the same on every card.
+ *
+ * formatPromo spells out the specifics — "przy zakupie 3: 60% taniej" — which is
+ * what the detail page wants and what makes a grid unreadable: forty cards, no
+ * two chips alike, nothing scannable. Here the chip says what kind of deal it is
+ * and the price beside it says the rest.
+ */
+export const PROMO_KIND_LABELS: Record<string, string> = {
+  price: 'Cena promo',
+  percent: 'Rabat',
+  multibuy: 'Wielosztuka',
+  bogo: 'Gratis',
+}
+
+export function promoKindLabel(kind: string): string {
+  return PROMO_KIND_LABELS[kind] ?? PROMO_KIND_LABELS.price!
+}

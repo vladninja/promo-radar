@@ -101,10 +101,30 @@ screens would use. Light scheme only. Tables collapse to labelled cards below
 
 | Route | What it shows |
 |---|---|
-| `/` | Current promotions. Filters: search, shop, **category**, cross-shop only, needs-review. Sort by discount or unit price. |
+| `/` | Current promotions, one card per product. Filters: search, shop, **category**, cross-shop only, needs-review. Sort by discount or unit price. |
 | `/products/<id>` | The same product across every shop promoting it now, with the cheapest unit price marked. |
 | `/leaflets/<id>?page=n` | The source page image with offer boxes overlaid — the fastest way to check a parse. |
 | `/api/promos`, `/api/products/<id>` | JSON for the first two. |
+
+### What one card stands for
+
+A card is a product, not a printing. The same yoghurt on the cover and in the
+dairy section, and again in two other shops the same week, is one thing a shopper
+is looking for — so matched offers collapse to a single card at the lowest price,
+carrying the shop whose price that is. The detail page lists everywhere else it
+is on. Offers the matcher could not identify stay per-shop: without a product
+there is nothing to say two of them are the same thing.
+
+The cards carry icons rather than labels — several shops, loyalty card, needs
+review — each with a `<title>` for hover and screen readers. The shop appears as
+its mark on the thumbnail, and the mechanic as one chip per kind (`Cena promo`,
+`Rabat`, `Wielosztuka`, `Gratis`) so a grid of forty can be scanned. Dates are
+left to the detail page.
+
+A multibuy's headline is not a discount. "Trzeci produkt 100% taniej" is a third
+off three items, so sorting on the printed number put thirteen price-less bundles
+at the head of the list and every real bargain behind them; the sort spreads it
+over the bundle, and the card omits a percentage it would misstate.
 
 ### How two offers are compared
 

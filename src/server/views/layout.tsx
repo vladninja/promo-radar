@@ -142,11 +142,36 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   margin: 0; font-size: 13px; font-weight: 550; line-height: 1.35;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.prices { margin: 0; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.prices { margin: 0; display: flex; align-items: baseline; gap: .5rem; }
 .prices .price { font-size: 15px; }
 .prices .unit { font-size: 12px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
-.tags { margin: 0; display: flex; gap: .25rem; flex-wrap: wrap; }
+.tags { margin: 0; display: flex; gap: .25rem; flex-wrap: wrap; align-items: center; }
 .meta { margin: 0; font-size: 11.5px; color: var(--muted-fg); }
+
+/* The shop, worn on the thumbnail rather than spelled out in the tags. */
+.mark {
+  position: absolute; left: .5rem; bottom: .5rem; line-height: 0;
+  border-radius: 9999px; background: var(--card); padding: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.22);
+}
+.disc + .mark, .thumb .disc { z-index: 1; }
+
+/* One chip per mechanic, coloured so the grid can be read at a glance. */
+.badge.kind { font-weight: 550; }
+.badge.kind.price { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.badge.kind.percent { background: #f5f3ff; border-color: #ddd6fe; color: #6d28d9; }
+.badge.kind.multibuy { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; }
+.badge.kind.bogo { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+
+/* Icons stand in for the labels they replace; each carries its own <title>.
+   They ride on the price line: in the chip row they wrapped alone onto a
+   second line and read as an afterthought. */
+.icons { display: inline-flex; gap: .3125rem; margin-left: auto; align-items: center; align-self: center; }
+.icon { display: block; }
+.icon.cross { color: #15803d; }
+.icon.loyalty { color: #a16207; }
+.icon.coupon { color: #b45309; }
+.icon.review { color: #be123c; }
 
 /* Promotion detail */
 .crumbs { font-size: 12px; color: var(--muted-fg); margin: 0 0 .75rem; }
