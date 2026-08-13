@@ -1,6 +1,34 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { parseMediaItems } from '@/lib/sources/gazetkipromocyjne'
+import { collectPages, parseMediaItems } from '@/lib/sources/gazetkipromocyjne'
+
+describe('collectPages', () => {
+  it('keeps going after a short page', async () => {
+    // The live endpoint answers 99 for per_page=100 on the first page. Treating
+    // that as the end silently discarded more than half the archive.
+    const sizes = [99, 100, 24, 0]
+    const seen: number[] = []
+    const out = await collectPages(async (page) => {
+      seen.push(page)
+      return new Array(sizes[page - 1] ?? 0).fill({})
+    })
+    expect(seen).toEqual([1, 2, 3, 4])
+    expect(out).toHaveLength(223)
+  })
+
+  it('stops at the first empty page', async () => {
+    let calls = 0
+    const out = await collectPages(async () => { calls++; return [] })
+    expect(calls).toBe(1)
+    expect(out).toEqual([])
+  })
+
+  it('respects the page cap', async () => {
+    let calls = 0
+    await collectPages(async () => { calls++; return [{}] }, 3)
+    expect(calls).toBe(3)
+  })
+})
 
 const items = JSON.parse(
   readFileSync('tests/fixtures/media-2026-08-12.json', 'utf8'),

@@ -107,12 +107,32 @@ async function getJson(url: string): Promise<unknown[]> {
   return (await res.json()) as unknown[]
 }
 
+/**
+ * Walks paginated results until a page comes back empty.
+ *
+ * A short page is NOT the end: this endpoint returns 99 items for per_page=100
+ * on the first page, so stopping at `length < per_page` silently discarded more
+ * than half the archive and hid entire shops.
+ */
+export async function collectPages(
+  fetchPage: (page: number) => Promise<unknown[]>,
+  maxPages = 20,
+): Promise<unknown[]> {
+  const all: unknown[] = []
+  for (let page = 1; page <= maxPages; page++) {
+    const items = await fetchPage(page)
+    if (items.length === 0) break
+    all.push(...items)
+  }
+  return all
+}
+
 export const gazetkiSource: LeafletSource = {
   slug: 'gazetkipromocyjne',
 
   async discover(shopSlugs, since) {
     const found: DiscoveredLeaflet[] = []
-    for (let page = 1; page <= 10; page++) {
+    const items = await collectPages(async (page) => {
       const params = new URLSearchParams({
         mime_type: 'application/pdf',
         per_page: '100',
@@ -122,12 +142,9 @@ export const gazetkiSource: LeafletSource = {
         _fields: 'id,date,source_url,link,media_details',
       })
       if (since) params.set('after', since.toISOString())
-      const items = await getJson(
-        `${config.sourceBaseUrl}/wp-json/wp/v2/media?${params}`,
-      )
-      found.push(...parseMediaItems(items, shopSlugs))
-      if (items.length < 100) break
-    }
+      return getJson(`${config.sourceBaseUrl}/wp-json/wp/v2/media?${params}`)
+    })
+    found.push(...parseMediaItems(items, shopSlugs))
 
     // One listing page per shop supplies validity dates and page counts. If a
     // page is unreachable or its markup changes, discovery still works — the

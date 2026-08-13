@@ -4,17 +4,12 @@ import { join } from 'node:path'
 import { config } from '@/lib/config'
 import type { Db } from '@/lib/db/client'
 import {
-  jobRuns, leaflets, leafletPages, offers, shops, sourceCursors,
+  jobRuns, leaflets, leafletPages, shops, sourceCursors,
 } from '@/lib/db/schema'
 import { pageCount } from '@/lib/acquire/rasterize'
-import {
-  fallbackLeafletRange, parseDateBadge, parseIssueYear, resolveDates,
-} from '@/lib/extract/dates'
+import { fallbackLeafletRange } from '@/lib/extract/dates'
 import { extractPage, type PageResult, type VisionClient } from '@/lib/extract/vision'
-import { attachToProduct } from '@/lib/match/attach'
-import { coreName } from '@/lib/normalize/canonical'
-import { parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
-import { extractSize } from '@/lib/normalize/size'
+import { persistPageResult } from '@/lib/pipeline/persist'
 import type { LeafletSource } from '@/lib/sources/types'
 
 export interface ScanDeps {
@@ -248,57 +243,17 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
           continue
         }
 
-        const year =
-          parseIssueYear(outcome.result.issue_text ?? '') ??
-          leaflet!.publishedAt.getUTCFullYear()
-        const pageRange = outcome.result.page_date_badge
-          ? parseDateBadge(outcome.result.page_date_badge, year)
-          : null
-
-        await db.insert(leafletPages).values({
+        const persisted = await persistPageResult(db, {
           leafletId, pageNo,
           imagePath: outcome.imagePath, imageHash: outcome.imageHash,
-          status: 'done', rawJson: outcome.result,
-          validFrom: pageRange?.from ?? null, validTo: pageRange?.to ?? null,
+          result: outcome.result,
+          publishedAt: leaflet!.publishedAt,
+          leafletRange,
           tokensIn: outcome.tokensIn, tokensOut: outcome.tokensOut,
           splitRetry: outcome.splitRetry,
-        }).onConflictDoNothing()
+        })
         stats.pagesExtracted++
-
-        for (const tile of outcome.result.tiles) {
-          const offerRange = tile.date_badge
-            ? parseDateBadge(tile.date_badge, year)
-            : null
-          const { range, source: dateSrc } = resolveDates(
-            offerRange, pageRange, leafletRange,
-          )
-          const size = extractSize(tile.raw_name)
-          const unit = tile.unit_price_raw ? parseUnitPrice(tile.unit_price_raw) : null
-          const match = await attachToProduct(db, {
-            brand: tile.brand, name: tile.raw_name, size,
-          })
-
-          await db.insert(offers).values({
-            leafletId, pageNo,
-            rawName: tile.raw_name, brand: tile.brand, name: coreName(tile.raw_name),
-            sizeValue: size?.value ?? null, sizeUnit: size?.unit ?? null,
-            priceGrosze: tile.price ? parseGrosze(tile.price) : null,
-            priceBefore: tile.price_before ? parseGrosze(tile.price_before) : null,
-            priceRegular: tile.price_regular ? parseGrosze(tile.price_regular) : null,
-            discountPercent: tile.discount_percent,
-            promoKind: tile.promo_kind, minQty: tile.min_qty,
-            unitPriceGrosze: unit?.grosze ?? null, unitBasis: unit?.basis ?? null,
-            unitPriceRaw: tile.unit_price_raw,
-            requiresLoyalty: tile.requires_loyalty,
-            purchaseLimit: tile.purchase_limit,
-            validFrom: range.from, validTo: range.to, dateSource: dateSrc,
-            canonicalKey: match.canonicalKey, productId: match.productId,
-            matchMethod: match.method, matchScore: match.score,
-            needsReview: match.needsReview || dateSrc === 'leaflet',
-            bbox: tile.bbox,
-          })
-          stats.offersCreated++
-        }
+        stats.offersCreated += persisted.offersCreated
       }
 
       // Derive the leaflet range from what the pages actually said.
