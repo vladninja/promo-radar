@@ -109,6 +109,106 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .pager { display: flex; gap: .75rem; align-items: center; margin: 0 0 1rem; font-size: 13px; }
 
+
+/* Promotion cards */
+.grid {
+  display: grid; gap: .75rem;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+.promo {
+  display: flex; flex-direction: column; background: var(--card);
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden;
+  transition: box-shadow .12s ease, transform .12s ease;
+}
+.promo:hover {
+  text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.07);
+  transform: translateY(-1px);
+}
+.thumb {
+  position: relative; aspect-ratio: 4 / 3; background: #f4f4f5;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.thumb img { width: 100%; height: 100%; object-fit: contain; }
+.thumb.sm { aspect-ratio: 1 / 1; border-radius: calc(var(--radius) - 2px); }
+.noimg { color: var(--muted-fg); font-size: 11px; }
+.disc {
+  position: absolute; top: .5rem; left: .5rem; background: var(--accent);
+  color: #fff; font-size: 11px; font-weight: 650; padding: .125rem .375rem;
+  border-radius: 9999px;
+}
+.body { padding: .625rem .75rem .75rem; display: flex; flex-direction: column; gap: .375rem; }
+.pname {
+  margin: 0; font-size: 13px; font-weight: 550; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.prices { margin: 0; display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.prices .price { font-size: 15px; }
+.prices .unit { font-size: 12px; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
+.tags { margin: 0; display: flex; gap: .25rem; flex-wrap: wrap; }
+.meta { margin: 0; font-size: 11.5px; color: var(--muted-fg); }
+
+/* Promotion detail */
+.crumbs { font-size: 12px; color: var(--muted-fg); margin: 0 0 .75rem; }
+.detail {
+  display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 360px) minmax(0, 1fr);
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem;
+}
+.detail-img {
+  background: #f4f4f5; border-radius: var(--radius); overflow: hidden;
+  display: flex; align-items: center; justify-content: center; min-height: 200px;
+}
+.detail-img img { width: 100%; height: auto; display: block; }
+.detail-body h1 { margin-bottom: .25rem; }
+.pricebox {
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: .75rem; margin: 0 0 1rem; display: flex; flex-direction: column; gap: .25rem;
+}
+.pricebox .big {
+  font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums; margin-right: .5rem;
+}
+.unit-big { margin: 0; color: var(--muted-fg); font-variant-numeric: tabular-nums; }
+.verdict { margin: .25rem 0 0; font-size: 13px; font-weight: 550; }
+.verdict.good { color: #166534; }
+.verdict.bad { color: #9f1239; }
+.facts {
+  display: grid; grid-template-columns: auto 1fr; gap: .375rem 1rem;
+  margin: 0; font-size: 13px;
+}
+.facts dt { color: var(--muted-fg); }
+.facts dd { margin: 0; }
+.warn {
+  margin: 1rem 0 0; padding: .5rem .75rem; font-size: 13px;
+  background: var(--accent-soft); border: 1px solid #fecdd3; border-radius: var(--radius);
+  color: #9f1239;
+}
+
+/* Sideways browsing */
+.strip-wrap { margin-bottom: 1.75rem; }
+.strip-wrap h2 {
+  font-size: 1rem; font-weight: 650; letter-spacing: -0.01em; margin: 0 0 .625rem;
+}
+.sub-inline { font-weight: 400; font-size: 12px; color: var(--muted-fg); margin-left: .5rem; }
+.strip {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 168px; gap: .625rem;
+  overflow-x: auto; padding-bottom: .5rem; scroll-snap-type: x proximity;
+}
+.strip::-webkit-scrollbar { height: 8px; }
+.strip::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+.mini {
+  scroll-snap-align: start; background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: .5rem; display: flex;
+  flex-direction: column; gap: .375rem;
+}
+.mini:hover { text-decoration: none; border-color: var(--ring); }
+.mini .pname { font-size: 12px; }
+.mini .prices .price { font-size: 13px; }
+
+@media (max-width: 720px) {
+  .detail { grid-template-columns: 1fr; }
+}
+
 /* Narrow screens: each row becomes its own card, labelled from the header. */
 @media (max-width: 820px) {
   main { padding: 1rem; }

@@ -1,9 +1,6 @@
 storage/
 node_modules/
-.env*
-!.env.example
-storage/
-node_modules/
 .env
 !.env.example
 drizzle/meta/
+.playwright-mcp/

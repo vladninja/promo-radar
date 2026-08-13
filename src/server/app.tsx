@@ -1,10 +1,17 @@
 import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import type { Context } from 'hono'
 import { db } from '@/lib/db/client'
 import { leafletPages } from '@/lib/db/schema'
+import { renderCrop } from '@/lib/acquire/crop'
+import { config } from '@/lib/config'
 import { getLeafletPage } from '@/lib/queries/leaflet'
+import {
+  getPromo, getSameProductElsewhere, getSimilarPromos,
+} from '@/lib/queries/promo'
+import { PromoView } from '@/server/views/promo'
 import { getProduct } from '@/lib/queries/product'
 import { listPromos, type PromoFilters } from '@/lib/queries/promos'
 import { CATEGORIES, type Category } from '@/lib/normalize/category'
@@ -37,6 +44,36 @@ app.get('/', async (c) => {
 })
 
 app.get('/api/promos', async (c) => c.json(await listPromos(db, promoFilters(c))))
+
+app.get('/promos/:id', async (c) => {
+  const promo = await getPromo(db, c.req.param('id'))
+  if (!promo) return c.text('not found', 404)
+  const [elsewhere, similar] = await Promise.all([
+    getSameProductElsewhere(db, promo),
+    getSimilarPromos(db, promo),
+  ])
+  return c.html(<PromoView promo={promo} elsewhere={elsewhere} similar={similar} />)
+})
+
+// One promo tile, cropped out of its leaflet page and cached on disk.
+app.get('/api/crop/:id', async (c) => {
+  const promo = await getPromo(db, c.req.param('id'))
+  if (!promo || !promo.bbox) return c.text('no image', 404)
+  const pdfPath = join(
+    config.storageDir, 'pdf', promo.shopSlug, `${promo.externalId}.pdf`,
+  )
+  try {
+    const file = await renderCrop(
+      pdfPath, promo.pageNo, promo.bbox, join(config.storageDir, 'crops'),
+    )
+    return c.body(await readFile(file), 200, {
+      'Content-Type': 'image/jpeg',
+      'Cache-Control': 'public, max-age=604800',
+    })
+  } catch {
+    return c.text('crop unavailable', 404)
+  }
+})
 
 app.get('/products/:id', async (c) => {
   const product = await getProduct(db, c.req.param('id'))

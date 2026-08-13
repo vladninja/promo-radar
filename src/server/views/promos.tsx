@@ -52,64 +52,42 @@ export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
       </form>
 
       {rows.length === 0 ? (
-        <div class="card">
-          <p class="empty">Brak promocji dla tych filtrów.</p>
-        </div>
+        <div class="card"><p class="empty">Brak promocji dla tych filtrów.</p></div>
       ) : (
-        <div class="card">
-          <table>
-            <thead>
-              <tr>
-                <th>Promocja</th>
-                <th>Kategoria</th>
-                <th>Sklep</th>
-                <th class="num">Cena</th>
-                <th class="num">Za jednostkę</th>
-                <th>Rodzaj</th>
-                <th>Termin</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => (
-                <tr>
-                  <td class="name-cell">
-                    {r.productId
-                      ? <a class="name" href={`/products/${r.productId}`}>{r.rawName}</a>
-                      : <span class="name">{r.rawName}</span>}
-                    {r.shopCount > 1
-                      ? <> <span class="badge best">w {r.shopCount} sklepach</span></>
-                      : null}
-                    {r.needsReview
-                      ? <> <span class="badge review">do sprawdzenia</span></>
-                      : null}
-                  </td>
-                  <td data-label="Kategoria">
-                    <a class="badge cat" href={`/?category=${r.category}`}>
-                      {CATEGORY_LABELS[r.category]}
-                    </a>
-                  </td>
-                  <td data-label="Sklep">
-                    <a class="badge shop" href={`/?shop=${r.shopSlug}`}>{r.shopSlug}</a>
-                  </td>
-                  <td class="num price" data-label="Cena">
-                    {formatZl(r.priceGrosze)}
-                    {r.requiresLoyalty
-                      ? <> <span class="badge card-only">z kartą</span></>
-                      : null}
-                  </td>
-                  <td class="num" data-label="Za jednostkę">
-                    {formatUnitPrice(r.unitPriceGrosze, r.unitBasis)}
-                  </td>
-                  <td data-label="Rodzaj">
-                    {formatPromo(r.promoKind, r.minQty, r.discountPercent)}
-                  </td>
-                  <td data-label="Termin" class="muted">
-                    {formatRange(r.validFrom, r.validTo)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div class="grid">
+          {rows.map((r) => (
+            <a class="promo" href={`/promos/${r.offerId}`}>
+              <div class="thumb">
+                <img src={`/api/crop/${r.offerId}`} alt="" loading="lazy" />
+                {r.discountPercent !== null
+                  ? <span class="disc">-{r.discountPercent}%</span>
+                  : null}
+              </div>
+              <div class="body">
+                <p class="pname">{r.rawName}</p>
+                <p class="prices">
+                  <span class="price">{formatZl(r.priceGrosze)}</span>
+                  {r.unitPriceGrosze !== null
+                    ? <span class="unit">{formatUnitPrice(r.unitPriceGrosze, r.unitBasis)}</span>
+                    : null}
+                </p>
+                <p class="tags">
+                  <span class="badge shop">{r.shopSlug}</span>
+                  <span class="badge cat">{CATEGORY_LABELS[r.category]}</span>
+                  {r.requiresLoyalty ? <span class="badge card-only">z kartą</span> : null}
+                  {r.shopCount > 1
+                    ? <span class="badge best">w {r.shopCount} sklepach</span>
+                    : null}
+                  {r.needsReview ? <span class="badge review">do sprawdzenia</span> : null}
+                </p>
+                <p class="meta">
+                  {formatPromo(r.promoKind, r.minQty, r.discountPercent)}
+                  {' · '}
+                  {formatRange(r.validFrom, r.validTo)}
+                </p>
+              </div>
+            </a>
+          ))}
         </div>
       )}
     </Layout>
