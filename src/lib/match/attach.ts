@@ -1,8 +1,18 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, or, sql, type SQLWrapper } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { products } from '@/lib/db/schema'
 import { canonicalKey, coreName } from '@/lib/normalize/canonical'
 import type { Size } from '@/lib/normalize/size'
+
+/** Brands compare on letters and digits only, so "Coca-Cola" meets "Coca Cola". */
+export function normalizeBrand(brand: string | null): string | null {
+  if (!brand) return null
+  const key = brand.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+  return key.length > 0 ? key : null
+}
+
+const brandNorm = (col: SQLWrapper) =>
+  sql`regexp_replace(lower(${col}), '[^[:alnum:]]+', '', 'g')`
 
 export const THRESHOLD_ATTACH = 0.55
 export const THRESHOLD_REVIEW = 0.45
@@ -38,6 +48,15 @@ export async function attachToProduct(
     return { productId: exact.id, canonicalKey: key, method: 'exact', score: null, needsReview: false }
   }
 
+  // Two named brands that are not the same brand are not the same product, however
+  // similar the words around them read. "Mleko Łaciate 3,2%" and "Mleko Mlekovita
+  // 3,2%" differ by one token and would otherwise merge, which for a price
+  // comparison is worse than not matching at all.
+  const brandKey = normalizeBrand(input.brand)
+  const brandFilter = brandKey
+    ? or(isNull(products.brand), sql`${brandNorm(products.brand)} = ${brandKey}`)
+    : sql`true`
+
   const sizeFilter = input.size
     ? and(
         eq(products.sizeUnit, input.size.unit),
@@ -52,7 +71,7 @@ export async function attachToProduct(
       score: sql<number>`similarity(${products.displayName}, ${core})`.as('score'),
     })
     .from(products)
-    .where(sizeFilter)
+    .where(and(sizeFilter, brandFilter))
     .orderBy(sql`similarity(${products.displayName}, ${core}) desc`)
     .limit(1)
 

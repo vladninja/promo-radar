@@ -93,6 +93,32 @@ describe('attachToProduct', () => {
     expect(r.method === 'new' || r.needsReview).toBe(true)
   })
 
+  it('never merges two different named brands', async () => {
+    const first = await attachToProduct(db, {
+      brand: 'Łaciate', name: 'Mleko UHT Łaciate 3,2%, 1 l',
+      size: { value: 1000, unit: 'ml' },
+    })
+    const second = await attachToProduct(db, {
+      brand: 'Mlekovita', name: 'Mleko UHT Mlekovita 3,2%, 1 l',
+      size: { value: 1000, unit: 'ml' },
+    })
+    // The names are one token apart, so similarity alone would merge them.
+    expect(second.productId).not.toBe(first.productId)
+    expect(second.method).toBe('new')
+  })
+
+  it('still matches the same brand written differently', async () => {
+    const first = await attachToProduct(db, {
+      brand: 'Coca-Cola', name: 'Napój gazowany Coca-Cola, 2 l',
+      size: { value: 2000, unit: 'ml' },
+    })
+    const second = await attachToProduct(db, {
+      brand: 'coca cola', name: 'Napój gazowany Coca Cola 2 l',
+      size: { value: 2000, unit: 'ml' },
+    })
+    expect(second.productId).toBe(first.productId)
+  })
+
   it('matches loose goods on name alone', async () => {
     const first = await attachToProduct(db, {
       brand: null, name: 'Winogrono jasne na wagę', size: null,
