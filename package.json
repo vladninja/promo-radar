@@ -6,6 +6,7 @@
     "scan": "tsx scripts/scan.ts",
     "reparse": "tsx scripts/reparse.ts",
     "rescore": "tsx scripts/rescore.ts",
+    "link": "tsx scripts/link-products.ts",
     "prune": "tsx scripts/prune-pages.ts",
     "db:up": "docker-compose up -d && sleep 3",
     "db:generate": "drizzle-kit generate",

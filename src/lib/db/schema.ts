@@ -118,3 +118,20 @@ export const jobRuns = pgTable('job_runs', {
   stats: jsonb('stats'),
   error: text('error'),
 })
+
+/**
+ * What the model decided about a pair of products.
+ *
+ * Keyed on the two canonical keys rather than on ids: `rescore` rebuilds the
+ * products table, and a cache keyed on ids would be discarded exactly when the
+ * matching rules change — the moment it is most expensive to lose.
+ */
+export const matchVerdicts = pgTable('match_verdicts', {
+  pairKey: text('pair_key').primaryKey(),
+  aName: text('a_name').notNull(),
+  bName: text('b_name').notNull(),
+  same: boolean('same').notNull(),
+  reason: text('reason'),
+  model: text('model').notNull(),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+})

@@ -31,6 +31,8 @@ docker-compose exec -T db psql -U promo -d promo_radar -c \
 | `MAX_PAGES_PER_RUN=0 pnpm scan` | Free dry run: reports what would be parsed without spending anything. |
 | `pnpm reparse <externalId>` | Clear one leaflet so the next scan re-extracts it. |
 | `pnpm rescore` | Re-run matching over all offers. No API calls. |
+| `pnpm link --ask --apply` | Ask the model about product pairs the trigram cannot settle. Run after a scan. |
+| `pnpm link --apply` | Re-apply the cached verdicts, e.g. after a rescore. No API calls. |
 | `pnpm tsx scripts/reclassify.ts` | Rescue offers stuck in "inne" using the category rules. Promotes only, never demotes. |
 | `pnpm tsx scripts/rebuild-offers.ts` | Regenerate every offer from the readings already stored. No API calls. |
 | `pnpm prune` | Delete rendered page images older than 30 days. |
@@ -91,6 +93,32 @@ pipeline is not locked to one vision provider.
    letters or fewer are left alone. Products keep the readable name for the page
    and the stemmed one for the matcher; `pnpm tsx scripts/rescore.ts` re-keys the
    archive for free when the rules change.
+8. **Judge** — `pnpm link --ask --apply`, after the scan. See below.
+
+### Why similarity is not the judge
+
+The trigram scores "Ogórek gruntowy" against "Ogórki gruntowe" at 0.52 and
+"Jabłka Gala" against "Jabłka Ligol" at 0.78: the pair that should merge below
+the pair that must not. No threshold drawn across that ordering is right, so a
+threshold alone is wrong in both directions at once — it left the cucumbers
+apart and quietly merged "Karty edukacyjne" into "gry edukacyjne".
+
+So similarity proposes and the model disposes. It is a good candidate generator:
+it reduces 3.4M possible pairs to about 2000 worth asking about, at no cost. The
+model is then asked about those, in batches of 40, in both directions — pairs it
+was too shy to merge and attachments it made on a score alone. Brand differences
+are what it catches most: *ASTRA farby plakatowe* and *St. Majewski farby
+plakatowe* score 0.71 and are two different products.
+
+Every verdict is cached under the two canonical keys, never under product ids,
+because `rescore` rebuilds the products table — a cache keyed on ids would be
+discarded exactly when the matching rules change, the moment it is most expensive
+to lose. Re-running asks nothing and costs nothing; after a rescore,
+`pnpm link --apply` restores every decision for free.
+
+Whole categories on promotion and private labels are never asked about: one
+chain's own brand cannot be on sale in another, and "Wszystkie czekolady Milka"
+is not a product.
 
 ## Web UI
 
@@ -250,7 +278,9 @@ launchctl load ~/Library/LaunchAgents/com.promoradar.scan.plist
 launchctl list | grep promoradar
 ```
 
-Runs daily at 07:30, logging to `storage/scan.log` and `storage/scan.err.log`.
+Runs `pnpm scan` and then `pnpm link --ask --apply` daily at 07:30, logging to
+`storage/scan.log` and `storage/scan.err.log`. The linker runs second because it
+has nothing to judge until the scan has produced the products.
 
 ## Tests
 
