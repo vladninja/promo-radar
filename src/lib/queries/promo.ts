@@ -5,6 +5,8 @@ import type { Category } from '@/lib/normalize/category'
 
 export interface PromoDetail {
   offerId: string
+  /** Every page of the leaflet that printed this promotion. */
+  pageNos: number[]
   shopSlug: string
   leafletId: string
   externalId: string
@@ -78,6 +80,15 @@ const detailColumns = {
   bbox: offers.bbox,
 }
 
+/**
+ * One promotion, however many rows carry it.
+ *
+ * A leaflet prints its headline offers on the cover and again in the section, and
+ * a shop that quotes both a loyalty price and a price without the card produces a
+ * row for each. Those are one promotion to a shopper, so they are folded together
+ * here exactly as they are in the list — otherwise every printing has its own
+ * page and the same watermelon appears three times.
+ */
 export async function getPromo(db: Db, offerId: string): Promise<PromoDetail | null> {
   const [row] = await db
     .select(detailColumns)
@@ -87,7 +98,47 @@ export async function getPromo(db: Db, offerId: string): Promise<PromoDetail | n
     .where(eq(offers.id, offerId))
     .limit(1)
   if (!row) return null
-  return { ...row, bbox: isBox(row.bbox) ? row.bbox : null }
+
+  const siblings = await db
+    .select(detailColumns)
+    .from(offers)
+    .innerJoin(leaflets, eq(leaflets.id, offers.leafletId))
+    .innerJoin(shops, eq(shops.id, leaflets.shopId))
+    .where(and(
+      eq(offers.leafletId, row.leafletId),
+      eq(offers.rawName, row.rawName),
+      eq(offers.promoKind, row.promoKind),
+    ))
+
+  const same = siblings.filter((s) =>
+    s.minQty === row.minQty &&
+    s.validFrom?.getTime() === row.validFrom?.getTime() &&
+    s.validTo?.getTime() === row.validTo?.getTime(),
+  )
+
+  // The loyalty price is the headline; the price without the card is the
+  // comparison, which is what "pr" means everywhere else.
+  const card = same.find((s) => s.requiresLoyalty) ?? row
+  const plain = same.find((s) => !s.requiresLoyalty)
+  const merged = { ...card }
+  if (plain && plain.offerId !== card.offerId) {
+    merged.priceRegular ??= plain.priceGrosze
+    merged.priceBefore ??= plain.priceBefore
+    merged.discountPercent ??= plain.discountPercent
+  }
+  for (const s of same) {
+    merged.unitPriceGrosze ??= s.unitPriceGrosze
+    merged.unitBasis ??= s.unitBasis
+    merged.purchaseLimit ??= s.purchaseLimit
+    merged.priceBefore ??= s.priceBefore
+    if (!isBox(merged.bbox) && isBox(s.bbox)) merged.bbox = s.bbox
+  }
+
+  return {
+    ...merged,
+    pageNos: [...new Set(same.map((s) => s.pageNo))].sort((a, b) => a - b),
+    bbox: isBox(merged.bbox) ? merged.bbox : null,
+  }
 }
 
 /**
@@ -116,13 +167,23 @@ export async function getSameProductElsewhere(
     .innerJoin(shops, eq(shops.id, leaflets.shopId))
     .where(and(
       eq(offers.productId, promo.productId),
-      ne(offers.id, promo.offerId),
+      ne(offers.leafletId, promo.leafletId),   // other leaflets, not other printings
       lte(offers.validFrom, now),
       gte(offers.validTo, now),
     ))
     .orderBy(sql`${offers.unitPriceGrosze} asc nulls last`)
     .limit(12)
-  return rows.map((r) => ({ ...r, hasImage: isBox(r.bbox) }))
+
+  // One entry per shop: another leaflet may print the same offer twice as well.
+  const seen = new Set<string>()
+  return rows
+    .filter((r) => {
+      const key = `${r.shopSlug}|${r.priceGrosze}|${r.requiresLoyalty}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    .map((r) => ({ ...r, hasImage: isBox(r.bbox) }))
 }
 
 /** Other promotions from the same aisle, for browsing sideways. */

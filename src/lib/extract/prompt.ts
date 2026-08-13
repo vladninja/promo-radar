@@ -43,6 +43,11 @@ Page-level keys:
 
 Do not invent tiles for decorative images or for the shop's own logo.
 
+A tile printing two prices for one product — a loyalty price beside a price
+without the card ("z kartą 1,49" and "bez karty 1,99", "cena bez karty Lidl
+Plus") — is ONE promotion, not two. Put the loyalty price in p, the other in pr,
+and set l true. Never emit a second tile for the same product.
+
 Only ever report prices belonging to THIS shop. Leaflets print competitor
 comparisons: a Lidl page may show its own 8,99 beside Biedronka's 12,99 for the
 same product, sometimes under another shop's logo. Emit one tile, with this

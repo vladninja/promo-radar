@@ -118,9 +118,13 @@ export function PromoView(props: {
             {p.purchaseLimit ? <><dt>Limit</dt><dd>{p.purchaseLimit}</dd></> : null}
             <dt>Źródło</dt>
             <dd>
-              <a href={`/leaflets/${p.leafletId}?page=${p.pageNo}`}>
-                gazetka, s. {p.pageNo}
-              </a>
+              {p.pageNos.map((n, i) => (
+                <>
+                  {i > 0 ? ', ' : ''}
+                  <a href={`/leaflets/${p.leafletId}?page=${n}`}>s. {n}</a>
+                </>
+              ))}
+              {p.pageNos.length > 1 ? <span class="muted"> — ta sama oferta</span> : null}
             </dd>
           </dl>
 
