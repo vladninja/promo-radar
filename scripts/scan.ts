@@ -6,6 +6,23 @@ import { sources } from '@/lib/sources'
 
 const source = sources['gazetkipromocyjne']!
 
+/**
+ * Only one scan may run at a time. Two overlapping runs process the same pages
+ * and write the offers twice, which is both wasted money and silently doubled
+ * data — and a daily cron plus a manual run is exactly how that happens.
+ */
+const SCAN_LOCK = 8_147_213
+const lock = await pool.connect()
+const { rows: locked } = await lock.query<{ ok: boolean }>(
+  'select pg_try_advisory_lock($1) as ok', [SCAN_LOCK],
+)
+if (!locked[0]?.ok) {
+  console.error('another scan holds the lock — not starting a second one')
+  lock.release()
+  await pool.end()
+  process.exit(3)
+}
+
 try {
   const stats = await runScan({
     db, source,
@@ -29,5 +46,7 @@ try {
   console.error(e)
   process.exitCode = 2
 } finally {
+  await lock.query('select pg_advisory_unlock($1)', [SCAN_LOCK])
+  lock.release()
   await pool.end()
 }
