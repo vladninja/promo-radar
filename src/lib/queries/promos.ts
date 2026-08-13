@@ -81,5 +81,26 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
     .orderBy(order)
     .limit(300)
 
-  return rows.map((r) => ({ ...r, shopCount: Number(r.shopCount) }))
+  // A leaflet prints its headline offers on the cover and again in the section,
+  // so the same promotion arrives twice. That is one promotion, not two: merge on
+  // shop, identity, price, mechanic and dates, keeping the fuller printing.
+  const merged = new Map<string, PromoRow>()
+  for (const r of rows) {
+    const row: PromoRow = { ...r, shopCount: Number(r.shopCount) }
+    const key = [
+      row.shopSlug, row.productId ?? row.rawName, row.priceGrosze ?? 'x',
+      row.promoKind, row.minQty ?? 'x', row.requiresLoyalty,
+      row.validFrom?.getTime() ?? 'x', row.validTo?.getTime() ?? 'x',
+    ].join('|')
+    const seen = merged.get(key)
+    if (!seen) {
+      merged.set(key, row)
+      continue
+    }
+    seen.unitPriceGrosze ??= row.unitPriceGrosze
+    seen.unitBasis ??= row.unitBasis
+    seen.discountPercent ??= row.discountPercent
+    seen.needsReview = seen.needsReview || row.needsReview
+  }
+  return [...merged.values()]
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
+import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
 import { listPromos } from '@/lib/queries/promos'
@@ -105,6 +106,28 @@ describe('listPromos', () => {
   it('sorts by discount descending by default', async () => {
     const rows = await listPromos(db, { now: NOW, crossShopOnly: true })
     expect(rows[0]!.discountPercent).toBe(60)
+  })
+
+  it('shows one row for a promotion printed on two pages', async () => {
+    // Leaflets advertise headline offers on the cover and again in the section,
+    // the second printing usually carrying more detail.
+    const [existing] = await db.select().from(offers)
+      .where(eq(offers.rawName, 'Chleb pszenny, 500 g')).limit(1)
+    expect(existing!.unitPriceGrosze).toBeNull()   // the cover printing
+
+    await db.insert(offers).values({
+      leafletId: existing!.leafletId, pageNo: 7,
+      rawName: existing!.rawName, name: existing!.name,
+      priceGrosze: existing!.priceGrosze, promoKind: 'price',
+      requiresLoyalty: existing!.requiresLoyalty, productId: existing!.productId,
+      unitPriceGrosze: 698, unitBasis: 'kg',       // the section printing, fuller
+      validFrom: existing!.validFrom, validTo: existing!.validTo,
+      dateSource: 'offer',
+    })
+
+    const rows = await listPromos(db, { now: NOW, q: 'chleb' })
+    expect(rows).toHaveLength(1)                   // one promotion, not two pages
+    expect(rows[0]!.unitPriceGrosze).toBe(698)     // enriched by the fuller row
   })
 
   it('carries the loyalty flag through', async () => {

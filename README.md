@@ -91,9 +91,15 @@ pnpm dev     # http://localhost:3000
 A single Hono server rendering JSX to HTML. No client JavaScript, no bundler —
 the screens are read-only and filters are a plain GET form.
 
+Styling follows shadcn's design language (neutral palette as CSS variables, one
+radius scale, muted foregrounds, card surfaces, pill badges) written as plain
+CSS. shadcn itself is React plus Radix plus Tailwind, none of which these static
+screens would use. Light scheme only. Tables collapse to labelled cards below
+820px.
+
 | Route | What it shows |
 |---|---|
-| `/` | Current promos. Filters: search, shop, cross-shop only, needs-review. Sort by discount or unit price. |
+| `/` | Current promotions. Filters: search, shop, **category**, cross-shop only, needs-review. Sort by discount or unit price. |
 | `/products/<id>` | The same product across every shop promoting it now, with the cheapest unit price marked. |
 | `/leaflets/<id>?page=n` | The source page image with offer boxes overlaid — the fastest way to check a parse. |
 | `/api/promos`, `/api/products/<id>` | JSON for the first two. |
