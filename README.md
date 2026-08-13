@@ -124,6 +124,22 @@ output dominates, the whole 110→70 spread is about 5%. 70 dpi also misread a
 product code (`AMAK00052` → `AMK00052`). Not worth degrading fine text. **Keep
 110 dpi.**
 
+**Cheaper image `detail` — `low` costs *more* than `high`.** Image cost is
+patch-based (`ceil(w/32) × ceil(h/32)`), so `low` sends a 512×512 copy for a
+fraction of the input. Measured on the same page:
+
+| detail | tokens in | tokens out | cost | result |
+|---|---|---|---|---|
+| `low` | 1,221 | 2,327 | $0.00304 | hallucinated names and prices, all reference prices lost |
+| `high` | 3,977 | 810 | $0.00177 | correct |
+| `original` | 5,521 | 1,036 | $0.00235 | correct, no measurable gain over `high` |
+
+Starved of detail the model guesses, and guessing costs output tokens — nearly
+3× as many — so the bill goes *up* while the data becomes wrong. `original`
+skips the downsampling `high` applies above ~2,500 patches, but costs 33% more
+for no demonstrated benefit. **Keep `high`** (`VISION_DETAIL` if you want to
+re-test on a future model).
+
 **Local OCR gate to skip page-images with no prices — unsafe, would lose
 offers.** Of a real 44-page leaflet, tesseract found price-shaped text on 41
 pages, so the upside was only ~7%. Worse, one of the three "empty" pages

@@ -4,10 +4,19 @@ import type { PageResult } from '@/lib/extract/schema'
 export type { OfferTile, PageResult } from '@/lib/extract/schema'
 export { OfferTileSchema, PageResultSchema } from '@/lib/extract/schema'
 
+/**
+ * How much of the image the model is given. Cost is patch-based
+ * (ceil(w/32) x ceil(h/32)): 'low' uses a 512x512 copy (~256 patches), 'high'
+ * caps at ~2500 patches and downsamples anything larger, 'original' does not
+ * resize at all on GPT-5.6.
+ */
+export type ImageDetail = 'low' | 'high' | 'original' | 'auto'
+
 export interface VisionClient {
   parsePage(
     imagePath: string,
     model: string,
+    detail?: ImageDetail,
   ): Promise<{ result: PageResult; tokensIn: number; tokensOut: number }>
 }
 

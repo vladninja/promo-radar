@@ -20,6 +20,10 @@ export const config = {
   visionModel: process.env.VISION_MODEL ?? 'gpt-5.6-luna',
   visionModelEscalation: process.env.VISION_MODEL_ESCALATION ?? 'gpt-5.6-terra',
   maxPagesPerRun: Number(process.env.MAX_PAGES_PER_RUN ?? 400),
+  /** See ImageDetail in extract/vision.ts. 'low' is far cheaper but reads a
+   *  512x512 copy, which is measured in scripts/calibrate-dpi.ts. */
+  visionDetail: (process.env.VISION_DETAIL ?? 'high') as
+    'low' | 'high' | 'original' | 'auto',
   /**
    * Ignore leaflets published longer ago than this. Validity dates only exist
    * inside the PDF, so publication age is the only cheap signal available

@@ -11,7 +11,7 @@ export function createOpenAiVisionClient(): VisionClient {
   const prompt = buildPrompt()
 
   return {
-    async parsePage(imagePath, model) {
+    async parsePage(imagePath, model, detail = config.visionDetail) {
       const b64 = (await readFile(imagePath)).toString('base64')
       const res = await client.responses.parse({
         model,
@@ -19,7 +19,7 @@ export function createOpenAiVisionClient(): VisionClient {
           role: 'user',
           content: [
             { type: 'input_text', text: prompt },
-            { type: 'input_image', image_url: `data:image/jpeg;base64,${b64}`, detail: 'high' },
+            { type: 'input_image', image_url: `data:image/jpeg;base64,${b64}`, detail },
           ],
         }],
         text: { format: zodTextFormat(WirePageSchema, 'page') },
