@@ -13,7 +13,7 @@ export const matchMethod = pgEnum('match_method', ['exact', 'trigram', 'new'])
 export const category = pgEnum('category', [
   'owoce-warzywa', 'mieso-wedliny', 'ryby', 'nabial', 'pieczywo', 'napoje',
   'alkohol', 'slodycze-przekaski', 'mrozonki', 'spozywcze', 'chemia-higiena',
-  'dom-ogrod', 'inne',
+  'dom-ogrod', 'szkola-biuro', 'odziez', 'zwierzeta', 'zabawki', 'inne',
 ])
 
 export const shops = pgTable('shops', {

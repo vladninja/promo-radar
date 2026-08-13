@@ -31,6 +31,8 @@ docker-compose exec -T db psql -U promo -d promo_radar -c \
 | `MAX_PAGES_PER_RUN=0 pnpm scan` | Free dry run: reports what would be parsed without spending anything. |
 | `pnpm reparse <externalId>` | Clear one leaflet so the next scan re-extracts it. |
 | `pnpm rescore` | Re-run matching over all offers. No API calls. |
+| `pnpm tsx scripts/reclassify.ts` | Rescue offers stuck in "inne" using the category rules. Promotes only, never demotes. |
+| `pnpm tsx scripts/rebuild-offers.ts` | Regenerate every offer from the readings already stored. No API calls. |
 | `pnpm prune` | Delete rendered page images older than 30 days. |
 | `pnpm test` | Full test suite. Needs `pnpm db:up` first. |
 

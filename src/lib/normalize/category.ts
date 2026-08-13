@@ -19,6 +19,10 @@ export const CATEGORIES = [
   'spozywcze',
   'chemia-higiena',
   'dom-ogrod',
+  'szkola-biuro',
+  'odziez',
+  'zwierzeta',
+  'zabawki',
   'inne',
 ] as const
 
@@ -37,6 +41,10 @@ export const CATEGORY_LABELS: Record<Category, string> = {
   spozywcze: 'Artykuły spożywcze',
   'chemia-higiena': 'Chemia i higiena',
   'dom-ogrod': 'Dom i ogród',
+  'szkola-biuro': 'Szkoła i biuro',
+  odziez: 'Odzież',
+  zwierzeta: 'Zwierzęta',
+  zabawki: 'Zabawki',
   inne: 'Inne',
 }
 
@@ -58,8 +66,12 @@ const RULES: Array<[Category, RegExp]> = [
   ['slodycze-przekaski', /\b(czekolad\w*|batonik\w*|cukierk\w*|ciastk\w*|wafl\w*|chips\w*|paluszki\b|orzeszk\w*|słodycz\w*|milka|delicje|prince)\b/i],
   ['chemia-higiena', /\b(papier toaletowy|ręcznik\w* (papierow|kuchenn)\w*|proszek|płyn do|mydł\w*|szampon\w*|pasta do zębów|chust\w*|pieluch\w*|detergent\w*|floralys)\b/i],
   ['dom-ogrod', /\b(mebl\w*|fotel\w*|leżak\w*|huśtawk\w*|grill\b|donic\w*|kwiat\w*|wrzos\w*|lawend\w*|fikus\w*|rower\w*|trampolin\w*|domek dla dzieci|garnk\w*|krzesł\w*|robot koszący)\b/i],
-  // Pet food reads as meat or dairy on keywords alone; it is not groceries.
-  ['inne', /\b(karma|karmy|dla ps[aó]w?|dla kot[aów]+|przysmak dla)\b/i],
+  // Pet food reads as meat or dairy on keywords alone, so it must be claimed first.
+  ['zwierzeta', /\b(karm[ay]|karmę|przysmak dla|żwirek|dla ps[aó]w?|dla kot[aów]+|activ pet|dla zwierz\w*)\b/i],
+  // August leaflets are half stationery; this was most of what landed in "inne".
+  ['szkola-biuro', /\b(zeszyt\w*|długopis\w*|ołówk?[iu]?\w*|kredk\w*|piórnik\w*|zakreślacz\w*|korektor\w*|flamastr?\w*|marker\w*|temperówk\w*|gumka\b|nożyczk\w*|plecak\w*|linijk\w*|segregator\w*|teczk\w*|brystol\w*|blok (rysunkow|techniczn)\w*|karteczki|klej\b|kleje\b|farby plakatowe|piśmienni\w*|szkoln\w*)\b/i],
+  ['odziez', /\b(bluz[aey]\w*|koszulk\w*|spodni\w*|buty|obuwi\w*|skarpet\w*|bielizn\w*|kurtk\w*|sukienk\w*|piżam\w*|dres\w*|legginsy|klapki|czapk\w*|esmara|livergy|pepperts)\b/i],
+  ['zabawki', /\b(zabawk\w*|klock\w*|lalk\w*|puzzle|gra planszowa|pluszak\w*|maskotk\w*)\b/i],
   ['spozywcze', /\b(ketchup\w*|majonez\w*|musztard\w*|sos\w*|makaron\w*|ryż|mąk[aęi]|cukier|olej|ocet|przypraw\w*|konserw\w*|hummus\w*|oliwk\w*|antipasti|guacamole|kiszon\w*|vital fresh|d[zż]em\w*|miód|kasz[aey]|płatk[iu]|herbatnik\w*)\b/i],
 ]
 
