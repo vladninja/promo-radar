@@ -101,7 +101,36 @@ The model emits short keys (`n`, `p`, `pb`, `dt`, `b`…) which
 saving is invisible outside `extract/`.
 
 Still on the table: the OpenAI **Batch API** is 50% off and fits a nightly cron,
-at the cost of a submit/collect state machine and up to 24h latency.
+at the cost of a submit/collect state machine and up to 24h latency. It is the
+only large saving left that carries no accuracy risk.
+
+### Measured and rejected
+
+Two plausible savings were tried and abandoned. Both are recorded here so they
+are not re-attempted from first principles.
+
+**Lower render resolution — worth ~5%, not the 15–20% expected.** Image tokens do
+not scale with page area; they bucket. Measured on one page with
+`scripts/calibrate-dpi.ts`:
+
+| dpi | pixels | tokens in | tokens out | cost |
+|---|---|---|---|---|
+| 110 | 1525×2481 | 3,977 | 1,006 | $0.00200 |
+| 90 | 1248×2030 | 4,024 | 1,160 | $0.00220 |
+| 70 | 970×1579 | 2,889 | 1,090 | $0.00189 |
+
+90 dpi cost *more* input than 110 despite a third fewer pixels, and because
+output dominates, the whole 110→70 spread is about 5%. 70 dpi also misread a
+product code (`AMAK00052` → `AMK00052`). Not worth degrading fine text. **Keep
+110 dpi.**
+
+**Local OCR gate to skip page-images with no prices — unsafe, would lose
+offers.** Of a real 44-page leaflet, tesseract found price-shaped text on 41
+pages, so the upside was only ~7%. Worse, one of the three "empty" pages
+(page 13) carried two genuine offers at 9,99 zł and 14,99 zł. Polish leaflets
+print prices as large stylized digits with a superscript grosze part, which OCR
+reads as decoration rather than money — so the gate would silently drop real
+offers to save $0.002. **Do not add an OCR pre-filter.**
 
 Pages that come back empty or with a priced tile missing its price are retried
 once as two overlapping halves on `gpt-5.6-terra`. Only those pages cost double.
