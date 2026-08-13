@@ -23,6 +23,7 @@ const tile = (over: Partial<PageResult['tiles'][number]> = {}) => ({
 const page = (over: Partial<PageResult> = {}): PageResult => ({
   page_date_badge: 'ŚRODA – PIĄTEK 12.08-14.08',
   issue_text: 'NR 33/2026 P',
+  no_offers: false,
   tiles: [tile()],
   ...over,
 })
@@ -30,6 +31,11 @@ const page = (over: Partial<PageResult> = {}): PageResult => ({
 describe('isSuspicious', () => {
   it('flags a page with no tiles', () => {
     expect(isSuspicious(page({ tiles: [] }))).toBe(true)
+  })
+  it('accepts an advertising page that says it has no offers', () => {
+    // Covers, competitions and loyalty spreads are legitimately empty. Retrying
+    // them on the dearer model found nothing and recorded a failure.
+    expect(isSuspicious(page({ tiles: [], no_offers: true }))).toBe(false)
   })
   it('flags a plain-price tile with no price', () => {
     expect(isSuspicious(page({

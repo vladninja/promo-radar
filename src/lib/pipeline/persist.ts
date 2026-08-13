@@ -54,7 +54,18 @@ export async function persistPageResult(
     validFrom: pageRange?.from ?? null, validTo: pageRange?.to ?? null,
     tokensIn: args.tokensIn ?? 0, tokensOut: args.tokensOut ?? 0,
     splitRetry: args.splitRetry ?? false,
-  }).onConflictDoNothing()
+  }).onConflictDoUpdate({
+    // A page that failed must be replaceable, otherwise the retry succeeds and
+    // the row stays marked failed with no data on it.
+    target: [leafletPages.leafletId, leafletPages.pageNo],
+    set: {
+      imagePath: args.imagePath, imageHash: args.imageHash,
+      status: 'done', rawJson: result, error: null,
+      validFrom: pageRange?.from ?? null, validTo: pageRange?.to ?? null,
+      tokensIn: args.tokensIn ?? 0, tokensOut: args.tokensOut ?? 0,
+      splitRetry: args.splitRetry ?? false,
+    },
+  })
 
   let offersCreated = 0
   for (const tile of result.tiles) {

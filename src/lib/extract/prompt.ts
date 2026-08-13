@@ -36,6 +36,9 @@ Keys are deliberately short. Emit exactly these per tile:
 Page-level keys:
 - pd: a date range printed as a page header, in the same "12.08-14.08" form. Null if absent.
 - iss: any issue marking such as "NR 33/2026". Null if absent.
+- ad: true when the page advertises no priced products at all — a cover, a
+  competition, a loyalty-collectible spread, a basket comparison. Say so plainly
+  rather than inventing a tile; an empty page is a normal thing for a leaflet.
 - t: the array of tiles.
 
 Do not invent tiles for decorative images or for the shop's own logo.

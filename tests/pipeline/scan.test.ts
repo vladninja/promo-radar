@@ -50,6 +50,7 @@ function fakeVision(counter: { calls: number }): VisionClient {
         result: {
           page_date_badge: 'ŚRODA – PIĄTEK 12.08-14.08',
           issue_text: 'NR 33/2026 P',
+          no_offers: false,
           tiles: [{
             raw_name: 'Masło Ekstra Mleczna Dolina, 200 g',
             brand: 'Mleczna Dolina',

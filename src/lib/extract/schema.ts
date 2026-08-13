@@ -33,6 +33,13 @@ export const OfferTileSchema = z.object({
 export const PageResultSchema = z.object({
   page_date_badge: z.string().nullable(),
   issue_text: z.string().nullable(),
+  /**
+   * The page advertises no priced products at all — a cover, a competition, a
+   * loyalty-scheme spread. Without this, an empty tile list is indistinguishable
+   * from a failed reading, so every advertising page paid for a split retry on
+   * the dearer model and was recorded as a failure anyway.
+   */
+  no_offers: z.boolean().default(false),
   tiles: z.array(OfferTileSchema),
 })
 
@@ -66,6 +73,7 @@ export const WireTileSchema = z.object({
 export const WirePageSchema = z.object({
   pd: z.string().nullable(),           // page-level date range
   iss: z.string().nullable(),          // issue marking, e.g. "NR 33/2026"
+  ad: z.boolean(),                     // page carries no priced products
   t: z.array(WireTileSchema),
 })
 
@@ -75,6 +83,7 @@ export function toPageResult(w: WirePage): PageResult {
   return {
     page_date_badge: w.pd,
     issue_text: w.iss,
+    no_offers: w.ad,
     tiles: w.t.map((t) => ({
       raw_name: t.n,
       brand: t.br,

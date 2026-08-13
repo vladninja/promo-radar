@@ -36,7 +36,7 @@ export type ExtractOutcome =
 
 /** A page is suspicious when it yielded nothing, or a priced tile lost its price. */
 export function isSuspicious(r: PageResult): boolean {
-  if (r.tiles.length === 0) return true
+  if (r.tiles.length === 0) return !r.no_offers
   return r.tiles.some(
     (t) => t.raw_name.trim().length > 0 && t.price === null && t.promo_kind === 'price',
   )
@@ -90,6 +90,7 @@ export async function extractPage(args: {
     const merged: PageResult = {
       page_date_badge: first.result.page_date_badge,
       issue_text: first.result.issue_text,
+      no_offers: false,
       tiles: [],
     }
     for (const half of halves) {
@@ -99,6 +100,8 @@ export async function extractPage(args: {
       merged.tiles.push(...r.result.tiles)
       merged.page_date_badge ??= r.result.page_date_badge
       merged.issue_text ??= r.result.issue_text
+      // Both halves agreeing there is nothing to read is an answer, not a failure.
+      merged.no_offers = merged.no_offers || r.result.no_offers
     }
     if (isSuspicious(merged)) {
       return {
