@@ -87,9 +87,12 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
   const merged = new Map<string, PromoRow>()
   for (const r of rows) {
     const row: PromoRow = { ...r, shopCount: Number(r.shopCount) }
+    // Loyalty is deliberately not part of the key: a shop quoting "z kartą 1,49"
+    // beside "bez karty 1,99" is running one promotion, and listing both makes
+    // the shop look like it competes with itself.
     const key = [
-      row.shopSlug, row.productId ?? row.rawName, row.priceGrosze ?? 'x',
-      row.promoKind, row.minQty ?? 'x', row.requiresLoyalty,
+      row.shopSlug, row.productId ?? row.rawName,
+      row.promoKind, row.minQty ?? 'x',
       row.validFrom?.getTime() ?? 'x', row.validTo?.getTime() ?? 'x',
     ].join('|')
     const seen = merged.get(key)
@@ -97,10 +100,15 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
       merged.set(key, row)
       continue
     }
-    seen.unitPriceGrosze ??= row.unitPriceGrosze
-    seen.unitBasis ??= row.unitBasis
-    seen.discountPercent ??= row.discountPercent
-    seen.needsReview = seen.needsReview || row.needsReview
+    // The price a shopper can actually pay is the lowest of the pair.
+    const cheaper =
+      (row.priceGrosze ?? Infinity) < (seen.priceGrosze ?? Infinity) ? row : seen
+    const other = cheaper === row ? seen : row
+    cheaper.unitPriceGrosze ??= other.unitPriceGrosze
+    cheaper.unitBasis ??= other.unitBasis
+    cheaper.discountPercent ??= other.discountPercent
+    cheaper.needsReview = cheaper.needsReview || other.needsReview
+    merged.set(key, cheaper)
   }
   return [...merged.values()]
 }

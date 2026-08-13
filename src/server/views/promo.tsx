@@ -51,13 +51,28 @@ export function PromoView(props: {
 }) {
   const p = props.promo
   const size = p.sizeValue ? `${p.sizeValue} ${p.sizeUnit}` : null
-  const cheapestElsewhere = props.elsewhere
-    .filter((o) => o.unitPriceGrosze !== null && o.unitBasis === p.unitBasis)
-    .sort((a, b) => (a.unitPriceGrosze ?? 0) - (b.unitPriceGrosze ?? 0))[0]
+  // Compare per unit when both sides state one, otherwise on the shelf price.
+  // These are offers on the same product, so the sizes already agree — refusing
+  // to compare for want of a unit price hides exactly what the page is for.
+  const byUnit =
+    p.unitPriceGrosze !== null &&
+    props.elsewhere.some((o) => o.unitPriceGrosze !== null && o.unitBasis === p.unitBasis)
+  const mine = byUnit ? p.unitPriceGrosze : p.priceGrosze
+  const rivals = props.elsewhere
+    .map((o) => ({ o, value: byUnit ? o.unitPriceGrosze : o.priceGrosze }))
+    .filter((r) => r.value !== null && (!byUnit || r.o.unitBasis === p.unitBasis))
+    .sort((a, b) => (a.value ?? 0) - (b.value ?? 0))
+  const cheapest = rivals[0]
+  const cheapestElsewhere = cheapest?.o
   const beatsAll =
-    p.unitPriceGrosze !== null && cheapestElsewhere?.unitPriceGrosze !== undefined
-      ? p.unitPriceGrosze <= (cheapestElsewhere.unitPriceGrosze ?? Infinity)
+    mine !== null && cheapest !== undefined
+      ? mine <= (cheapest.value ?? Infinity)
       : null
+  const rivalLabel = cheapest
+    ? byUnit
+      ? formatUnitPrice(cheapest.value, cheapestElsewhere!.unitBasis)
+      : formatZl(cheapest.value)
+    : null
 
   return (
     <Layout title={`${p.rawName} — Promo Radar`}>
@@ -97,9 +112,7 @@ export function PromoView(props: {
               <a class="verdict bad" href={`/promos/${cheapestElsewhere.offerId}`}>
                 <span>
                   Taniej w <strong>{cheapestElsewhere.shopSlug}</strong>:{' '}
-                  <strong>
-                    {formatUnitPrice(cheapestElsewhere.unitPriceGrosze, cheapestElsewhere.unitBasis)}
-                  </strong>
+                  <strong>{rivalLabel}</strong>
                 </span>
                 <span class="go">Zobacz →</span>
               </a>
