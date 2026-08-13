@@ -15,7 +15,7 @@
 import { eq } from 'drizzle-orm'
 import { db, pool } from '@/lib/db/client'
 import { offers } from '@/lib/db/schema'
-import { classifyCategory, isPetFood } from '@/lib/normalize/category'
+import { reclassifyCategory } from '@/lib/normalize/category'
 
 const apply = process.argv.includes('--apply')
 
@@ -27,11 +27,7 @@ try {
   const moves = new Map<string, number>()
   let changed = 0
   for (const row of rows) {
-    // Pet food may be moved out of any category; everything else is promoted
-    // out of "inne" only, so the model's judgement is never overwritten.
-    const pet = isPetFood(row.rawName)
-    if (!pet && row.category !== 'inne') continue
-    const next = pet ? 'zwierzeta' as const : classifyCategory(row.rawName)
+    const next = reclassifyCategory(row.rawName, row.category)
     if (next === row.category) continue
     changed++
     const key = `${row.category} -> ${next}`

@@ -116,3 +116,22 @@ export function classifyCategory(name: string): Category {
   }
   return 'inne'
 }
+
+/**
+ * The category an already-stored offer should end up in.
+ *
+ * Rules may promote, never demote. Most categories were assigned by the model
+ * while it read the page, and the model is far better at this than keywords —
+ * running the rules over everything moved 626 of 1272 offers, the bulk of them
+ * into "inne". So the rules only rescue offers already sitting there. Pet food
+ * is the one exception: it is confident enough to overrule the model.
+ *
+ * Shared by `reclassify` and `rescore`, because a rescore that quietly
+ * re-derived every category would undo the model's work as a side effect of
+ * re-running the matcher.
+ */
+export function reclassifyCategory(name: string, current: Category): Category {
+  if (isPetFood(name)) return 'zwierzeta'
+  if (current !== 'inne') return current
+  return classifyCategory(name)
+}

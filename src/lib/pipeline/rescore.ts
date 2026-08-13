@@ -2,7 +2,8 @@ import { eq, isNull, or } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { leaflets, offers, products } from '@/lib/db/schema'
 import { attachToProduct } from '@/lib/match/attach'
-import { classifyCategory } from '@/lib/normalize/category'
+import { reclassifyCategory } from '@/lib/normalize/category'
+import { looksLikeTokenPrice } from '@/lib/normalize/money'
 import { extractSize } from '@/lib/normalize/size'
 
 /**
@@ -31,14 +32,20 @@ export async function rescoreAll(db: Db): Promise<{ offers: number; relinked: nu
     const match = await attachToProduct(db, {
       brand: row.brand, name: row.rawName, size: extractSize(row.rawName),
     })
+    // A price behind a points coupon needs review however well it matched, and
+    // rescore clears the flag wholesale, so re-derive it here too.
+    const tokenPrice =
+      row.requiresCoupon ||
+      looksLikeTokenPrice(row.priceGrosze, row.priceBefore ?? row.priceRegular)
+
     await db.update(offers).set({
       // Re-classify too: extending the keyword rules should reach every offer
       // already stored, not only the ones read afterwards.
-      category: classifyCategory(row.rawName),
+      category: reclassifyCategory(row.rawName, row.category),
       canonicalKey: match.canonicalKey, productId: match.productId,
       matchMethod: match.method, matchScore: match.score,
       needsReview:
-        match.needsReview ||
+        match.needsReview || tokenPrice ||
         (row.dateSource === 'leaflet' && guessed.has(row.leafletId)),
     }).where(eq(offers.id, row.id))
     relinked++

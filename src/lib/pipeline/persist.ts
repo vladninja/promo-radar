@@ -76,10 +76,27 @@ export async function persistPageResult(
       offerRange, pageRange, leafletRange,
     )
     const size = extractSize(tile.raw_name)
+    const printed = tile.price ? parseGrosze(tile.price) : null
+    const reference =
+      (tile.price_before ? parseGrosze(tile.price_before) : null) ??
+      (tile.price_regular ? parseGrosze(tile.price_regular) : null)
+    // A price behind a points coupon is not one a shopper can simply pay. The
+    // marker is the reliable signal; the price floor is only a backstop for
+    // tiles where the model missed the badge.
+    const tokenPrice =
+      tile.requires_coupon || looksLikeTokenPrice(printed, reference)
+    // Stored as an ordinary price it tops every cheapest list — a 0,01 Danio
+    // beats every yoghurt in Poland. Fall back to the shelf price printed beside
+    // it, which is what a shopper without the points actually pays; where the
+    // tile prints none, the offer has no payable price and should say so rather
+    // than advertise a number nobody can pay.
+    const price = tokenPrice ? reference : printed
+
     // The unit printed against the main price is exact. The smaller per-100 g
     // restatement is rounded, and scaling it up invents a grosz: a shelf price of
     // 7,99 zł/kg is printed as "0,80 zł/100 g", which becomes 8,00 zł/kg.
-    const unit =
+    // Both restate the coupon price when there is one, so neither survives it.
+    const unit = tokenPrice ? null :
       (tile.price && tile.price_unit
         ? parseUnitPrice(`${tile.price} zł${tile.price_unit}`)
         : null) ??
@@ -88,30 +105,22 @@ export async function persistPageResult(
       brand: tile.brand, name: tile.raw_name, size,
     })
 
-    // A points-coupon price would otherwise sit at the top of every "cheapest"
-    // list. Keep the number — it is what the page says — but do not let it pass
-    // as an ordinary price unnoticed.
-    const price = tile.price ? parseGrosze(tile.price) : null
-    const reference =
-      (tile.price_before ? parseGrosze(tile.price_before) : null) ??
-      (tile.price_regular ? parseGrosze(tile.price_regular) : null)
-    // A price behind a points coupon is not one a shopper can simply pay. The
-    // marker is the reliable signal; the price floor is only a backstop for
-    // tiles where the model missed the badge.
-    const tokenPrice =
-      tile.requires_coupon || looksLikeTokenPrice(price, reference)
-
     await db.insert(offers).values({
       leafletId, pageNo,
       rawName: tile.raw_name, brand: tile.brand, name: coreName(tile.raw_name),
       sizeValue: size?.value ?? null, sizeUnit: size?.unit ?? null,
       priceGrosze: price,
-      priceBefore: tile.price_before ? parseGrosze(tile.price_before) : null,
-      priceRegular: tile.price_regular ? parseGrosze(tile.price_regular) : null,
-      discountPercent: tile.discount_percent,
+      // Where the shelf price stood in for a coupon price it is now the price
+      // itself, not a reduction from one.
+      priceBefore: tokenPrice ? null
+        : tile.price_before ? parseGrosze(tile.price_before) : null,
+      priceRegular: tokenPrice ? null
+        : tile.price_regular ? parseGrosze(tile.price_regular) : null,
+      // 0,01 off 8,99 is a 99% cut only if the coupon is yours to spend.
+      discountPercent: tokenPrice ? null : tile.discount_percent,
       promoKind: tile.promo_kind, minQty: tile.min_qty,
       unitPriceGrosze: unit?.grosze ?? null, unitBasis: unit?.basis ?? null,
-      unitPriceRaw: tile.unit_price_raw,
+      unitPriceRaw: tokenPrice ? null : tile.unit_price_raw,
       requiresLoyalty: tile.requires_loyalty,
       requiresCoupon: tile.requires_coupon,
       couponPoints: tile.coupon_points,
