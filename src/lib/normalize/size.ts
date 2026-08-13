@@ -17,7 +17,16 @@ function toCanonical(value: number, unit: string): Size {
   }
 }
 
+/**
+ * Loose goods sold by weight. "Winogrona jasne luzem 1 kg" is priced per kilo —
+ * the "1 kg" is the basis, not a package size — so treating it as a 1000 g pack
+ * stops it matching the same fruit sold as "na wagę" in another shop. Loose
+ * produce is where shops overlap most, so this matters.
+ */
+const LOOSE = /\b(luzem|na wag[eę]|na sztuki)\b/i
+
 export function extractSize(name: string): Size | null {
+  if (LOOSE.test(name)) return null
   const multi = name.match(MULTIPACK)
   if (multi) {
     const one = toCanonical(num(multi[2]!), multi[3]!)

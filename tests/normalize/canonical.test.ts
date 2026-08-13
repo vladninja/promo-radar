@@ -9,6 +9,13 @@ describe('coreName', () => {
   it('strips loose-goods wording', () => {
     expect(coreName('Winogrono jasne na wagę')).toBe('winogrono jasne')
   })
+  it('aligns loose produce across shops that word it differently', () => {
+    // Biedronka writes "na wagę", Kaufland writes "luzem 1 kg"; both are the
+    // same grapes sold by weight and must reduce to the same core name.
+    expect(coreName('Winogrono jasne na wagę')).toBe('winogrono jasne')
+    expect(coreName('Winogrona jasne luzem 1 kg')).toBe('winogrona jasne')
+  })
+
   it('collapses whitespace', () => {
     expect(coreName('Napój   gazowany,  2 l')).toBe('napój gazowany')
   })

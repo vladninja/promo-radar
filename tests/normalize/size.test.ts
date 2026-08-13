@@ -10,6 +10,9 @@ describe('extractSize', () => {
     ['Sok pomarańczowy, 900 ml', { value: 900, unit: 'ml' }],
     ['Jogurt naturalny, 4 x 125 g', { value: 500, unit: 'g' }],
     ['Winogrono jasne na wagę', null],
+    // "1 kg" on loose produce is the pricing basis, not a package size.
+    ['Winogrona jasne luzem 1 kg', null],
+    ['Cebula żółta luzem 1 kg', null],
     ['Karkówka grillowa pakowana próżniowo', null],
   ]
   it.each(cases)('extracts from %s', (input, expected) => {
