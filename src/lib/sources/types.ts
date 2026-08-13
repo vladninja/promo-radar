@@ -13,10 +13,10 @@ export interface DiscoveredLeaflet {
 
 export interface LeafletSource {
   slug: string
-  discover(
-    shopSlugs: readonly string[],
-    since: Date | null,
-  ): Promise<DiscoveredLeaflet[]>
+  /** Every leaflet the shops currently list, with its validity dates. No
+   *  cursor: the listing pages are short and already scoped to what is on
+   *  or near offer. */
+  discover(shopSlugs: readonly string[]): Promise<DiscoveredLeaflet[]>
   fetchAsset(
     leaflet: DiscoveredLeaflet,
     destDir: string,

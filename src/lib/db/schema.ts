@@ -103,8 +103,3 @@ export const jobRuns = pgTable('job_runs', {
   stats: jsonb('stats'),
   error: text('error'),
 })
-
-export const sourceCursors = pgTable('source_cursors', {
-  sourceSlug: text('source_slug').primaryKey(),
-  lastSeenDate: timestamp('last_seen_date', { withTimezone: true }).notNull(),
-})

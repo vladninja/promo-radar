@@ -13,7 +13,7 @@ const db = drizzle(pool)
 
 beforeEach(async () => {
   await pool.query(
-    'truncate offers, leaflet_pages, leaflets, products, shops, job_runs, source_cursors cascade',
+    'truncate offers, leaflet_pages, leaflets, products, shops, job_runs cascade',
   )
   await db.insert(shops).values([
     { slug: 'biedronka', name: 'Biedronka' },
@@ -151,7 +151,7 @@ describe('runScan', () => {
     await runScan(deps(first, 1))
     expect(first.calls).toBe(1)
 
-    // Discovery now returns nothing: the cursor has moved past this leaflet.
+    // Discovery returns nothing this run; the leaflet must still be resumed.
     const emptySource: LeafletSource = {
       ...fakeSource,
       async discover() { return [] },
@@ -165,19 +165,6 @@ describe('runScan', () => {
     expect(await db.select().from(leafletPages)).toHaveLength(2)
     const [l] = await db.select().from(leaflets)
     expect(l!.status).toBe('done')
-  })
-
-  it('advances the source cursor to the newest publication seen', async () => {
-    await runScan(deps({ calls: 0 }))
-    const { rows } = await pool.query('select last_seen_date from source_cursors')
-    expect(new Date(rows[0].last_seen_date).toISOString())
-      .toBe('2026-08-12T10:17:04.000Z')
-  })
-
-  it('does not advance the cursor when the run was capped', async () => {
-    await runScan(deps({ calls: 0 }, 1))
-    const { rows } = await pool.query('select last_seen_date from source_cursors')
-    expect(rows).toHaveLength(0)
   })
 
   it('ignores leaflets published longer ago than the age limit', async () => {
@@ -285,11 +272,9 @@ describe('runScan', () => {
     const rows = await db.select().from(leaflets)
     expect(rows.map((r) => r.externalId)).toEqual(['TODAY'])
 
-    // The cursor must stay behind the future leaflet, or it would never be
-    // discovered again once it becomes current.
-    const { rows: cur } = await pool.query('select last_seen_date from source_cursors')
-    expect(new Date(cur[0].last_seen_date) < new Date('2026-08-11T00:00:00Z')).toBe(true)
-    expect(NOW > new Date('2026-08-11T00:00:00Z')).toBe(true)   // sanity
+    // Nothing to hide it from a later run: discovery re-reads the listing page
+    // every time, so it reappears on the day it becomes current.
+    expect(NOW < new Date('2026-08-17T00:00:00Z')).toBe(true)
   })
 
   it('reuses an identical page instead of paying for it twice', async () => {

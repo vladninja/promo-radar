@@ -8,7 +8,7 @@ const db = drizzle(pool)
 
 beforeAll(async () => {
   await pool.query(
-    'truncate offers, leaflet_pages, leaflets, products, shops, job_runs, source_cursors cascade',
+    'truncate offers, leaflet_pages, leaflets, products, shops, job_runs cascade',
   )
 })
 

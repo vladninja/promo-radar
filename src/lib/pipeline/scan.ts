@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { config } from '@/lib/config'
 import type { Db } from '@/lib/db/client'
 import {
-  jobRuns, leaflets, leafletPages, shops, sourceCursors,
+  jobRuns, leaflets, leafletPages, shops,
 } from '@/lib/db/schema'
 import { pageCount } from '@/lib/acquire/rasterize'
 import { fallbackLeafletRange } from '@/lib/extract/dates'
@@ -44,15 +44,13 @@ function costUsd(tokensIn: number, tokensOut: number, model: string): number {
   return (tokensIn * p.input + tokensOut * p.output) / 1_000_000
 }
 
-export async function isStale(
-  db: Db,
-  now: Date,
-  staleHours: number,
-): Promise<boolean> {
-  const [cursor] = await db.select().from(sourceCursors).limit(1)
-  if (!cursor) return false
-  const age = now.getTime() - cursor.lastSeenDate.getTime()
-  return age > staleHours * 3600 * 1000
+/**
+ * The source has stopped answering usefully. With discovery reading the shop
+ * listing pages directly, "no current leaflets at all" is the signal — there is
+ * no cursor to age out, and a healthy day always lists something.
+ */
+export function isStale(stats: ScanStats): boolean {
+  return stats.leafletsSeen === 0
 }
 
 export async function runScan(deps: ScanDeps): Promise<ScanStats> {
@@ -71,11 +69,7 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
     .returning({ id: jobRuns.id })
 
   try {
-    const [cursor] = await db.select().from(sourceCursors).limit(1)
-    const all = await source.discover(
-      config.shopAllowlist,
-      cursor?.lastSeenDate ?? null,
-    )
+    const all = await source.discover(config.shopAllowlist)
 
     // Only leaflets that can still be current. Validity dates live inside the
     // PDF, so publication age is the one signal available before paying to
@@ -105,7 +99,6 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
 
     const shopRows = await db.select().from(shops)
     const shopIdBySlug = new Map(shopRows.map((s) => [s.slug, s.id]))
-    let newestSeen = cursor?.lastSeenDate ?? null
     let pageBudget = deps.maxPages
 
     // Leaflets we have already stored but not finished — because a previous run
@@ -152,10 +145,6 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       if (!shopId) continue
       // Stop before downloading a PDF there is no budget left to parse.
       if (pageBudget <= 0) { stats.capped = true; break }
-      // Only discovery advances the cursor; resumed leaflets are already behind it.
-      if (item.leafletId === null && (!newestSeen || d.publishedAt > newestSeen)) {
-        newestSeen = d.publishedAt
-      }
 
       const [known] = item.leafletId
         ? [{ id: item.leafletId }]
@@ -285,27 +274,6 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       }).where(eq(leaflets.id, leafletId))
 
       if (stats.capped) break
-    }
-
-    // A not-yet-current leaflet must stay discoverable until the day it starts,
-    // so the cursor is held just behind the earliest one we skipped.
-    if (newestSeen && future.length > 0) {
-      const earliestFuture = new Date(
-        Math.min(...future.map((f) => f.publishedAt.getTime())) - 1,
-      )
-      if (earliestFuture < newestSeen) newestSeen = earliestFuture
-    }
-
-    // A capped run leaves discovered-but-untouched leaflets behind. Advancing
-    // the cursor past them would hide them from every future run, so the cursor
-    // only moves when the whole discovered set was worked through.
-    if (newestSeen && !stats.capped) {
-      await db.insert(sourceCursors)
-        .values({ sourceSlug: source.slug, lastSeenDate: newestSeen })
-        .onConflictDoUpdate({
-          target: sourceCursors.sourceSlug,
-          set: { lastSeenDate: newestSeen },
-        })
     }
 
     await db.update(jobRuns)

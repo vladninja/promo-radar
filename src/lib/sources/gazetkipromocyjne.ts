@@ -5,8 +5,6 @@ import { config } from '@/lib/config'
 import { createRateLimiter } from '@/lib/sources/rate-limit'
 import type { DiscoveredLeaflet, LeafletSource } from '@/lib/sources/types'
 
-const SHOP_FROM_LINK = /^https?:\/\/[^/]+\/([^/]+)\/attachment\//
-
 /**
  * The shop listing page carries what the media API does not: each leaflet's
  * validity range, and often its page count. Both sit in the same markup as the
@@ -51,37 +49,6 @@ export function parseShopMeta(html: string): Map<string, ShopLeafletMeta> {
   return out
 }
 
-export function parseMediaItems(
-  items: unknown[],
-  allowlist: readonly string[],
-): DiscoveredLeaflet[] {
-  const out: DiscoveredLeaflet[] = []
-  for (const raw of items) {
-    const it = raw as {
-      id?: number
-      date?: string
-      link?: string
-      source_url?: string
-      media_details?: { sizes?: { full?: { source_url?: string } } }
-    }
-    if (!it.id || !it.date || !it.link || !it.source_url) continue
-    const m = it.link.match(SHOP_FROM_LINK)
-    const slug = m?.[1]
-    if (!slug || !allowlist.includes(slug)) continue
-    out.push({
-      shopSlug: slug,
-      externalId: String(it.id),
-      pdfUrl: it.source_url,
-      publishedAt: new Date(it.date),
-      coverUrl: it.media_details?.sizes?.full?.source_url ?? null,
-      validFrom: null,
-      validTo: null,
-      pageCount: null,
-    })
-  }
-  return out
-}
-
 const limit = createRateLimiter(1000)
 
 async function getText(url: string): Promise<string | null> {
@@ -95,73 +62,46 @@ async function getText(url: string): Promise<string | null> {
   }
 }
 
-async function getJson(url: string): Promise<unknown[]> {
-  const res = await limit(() =>
-    fetch(url, { headers: { 'User-Agent': config.userAgent } }),
-  )
-  // Asking for a page past the last one answers 400 rest_post_invalid_page_number.
-  // That is the end of the results, not a failure — it happens whenever the
-  // total is an exact multiple of per_page.
-  if (res.status === 400) return []
-  if (!res.ok) throw new Error(`GET ${url} failed: ${res.status}`)
-  return (await res.json()) as unknown[]
-}
-
-/**
- * Walks paginated results until a page comes back empty.
- *
- * A short page is NOT the end: this endpoint returns 99 items for per_page=100
- * on the first page, so stopping at `length < per_page` silently discarded more
- * than half the archive and hid entire shops.
- */
-export async function collectPages(
-  fetchPage: (page: number) => Promise<unknown[]>,
-  maxPages = 20,
-): Promise<unknown[]> {
-  const all: unknown[] = []
-  for (let page = 1; page <= maxPages; page++) {
-    const items = await fetchPage(page)
-    if (items.length === 0) break
-    all.push(...items)
-  }
-  return all
+/** Pure mapping from listing-page metadata to discovered leaflets, so the
+ *  shape of what discovery returns is testable without network access. */
+export function shopMetaToLeaflets(
+  shopSlug: string,
+  meta: Map<string, ShopLeafletMeta>,
+  baseUrl = config.sourceBaseUrl,
+): DiscoveredLeaflet[] {
+  return [...meta].map(([id, m]) => ({
+    shopSlug,
+    externalId: id,
+    pdfUrl: `${baseUrl}/wp-content/uploads/pdf/${id}.pdf`,
+    publishedAt: m.validFrom,
+    coverUrl: null,
+    validFrom: m.validFrom,
+    validTo: m.validTo,
+    pageCount: m.pageCount,
+  }))
 }
 
 export const gazetkiSource: LeafletSource = {
   slug: 'gazetkipromocyjne',
 
-  async discover(shopSlugs, since) {
+  /**
+   * One request per shop. The listing page carries the validity dates, the page
+   * count and the PDF link together, which is everything discovery needs.
+   *
+   * The media REST endpoint was used for this and has been dropped: it has no
+   * validity dates, so it forced a walk of the whole 223-PDF archive plus a
+   * cursor, and returned the same 19 current leaflets this does. Its only extra
+   * was a publication timestamp, which validity dates make redundant.
+   */
+  async discover(shopSlugs) {
     const found: DiscoveredLeaflet[] = []
-    const items = await collectPages(async (page) => {
-      const params = new URLSearchParams({
-        mime_type: 'application/pdf',
-        per_page: '100',
-        page: String(page),
-        orderby: 'date',
-        order: 'asc',
-        _fields: 'id,date,source_url,link,media_details',
-      })
-      if (since) params.set('after', since.toISOString())
-      return getJson(`${config.sourceBaseUrl}/wp-json/wp/v2/media?${params}`)
-    })
-    found.push(...parseMediaItems(items, shopSlugs))
-
-    // One listing page per shop supplies validity dates and page counts. If a
-    // page is unreachable or its markup changes, discovery still works — the
-    // leaflet simply falls back to the publication-age rule.
-    for (const slug of new Set(found.map((f) => f.shopSlug))) {
+    for (const slug of shopSlugs) {
       const html = await getText(`${config.sourceBaseUrl}/${slug}/`)
       if (!html) continue
-      const meta = parseShopMeta(html)
-      for (const leaflet of found) {
-        if (leaflet.shopSlug !== slug) continue
-        const id = pdfIdFromUrl(leaflet.pdfUrl)
-        const m = id ? meta.get(id) : undefined
-        if (!m) continue
-        leaflet.validFrom = m.validFrom
-        leaflet.validTo = m.validTo
-        leaflet.pageCount = m.pageCount
-      }
+      // The listing page gives no publication time. The start of validity is
+      // the meaningful date here, and anchors the year when a page prints
+      // "12.08" with no year.
+      found.push(...shopMetaToLeaflets(slug, parseShopMeta(html)))
     }
     return found
   },

@@ -1,89 +1,40 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { collectPages, parseMediaItems } from '@/lib/sources/gazetkipromocyjne'
+import { parseShopMeta, shopMetaToLeaflets } from '@/lib/sources/gazetkipromocyjne'
 
-describe('collectPages', () => {
-  it('keeps going after a short page', async () => {
-    // The live endpoint answers 99 for per_page=100 on the first page. Treating
-    // that as the end silently discarded more than half the archive.
-    const sizes = [99, 100, 24, 0]
-    const seen: number[] = []
-    const out = await collectPages(async (page) => {
-      seen.push(page)
-      return new Array(sizes[page - 1] ?? 0).fill({})
-    })
-    expect(seen).toEqual([1, 2, 3, 4])
-    expect(out).toHaveLength(223)
+const html = readFileSync('tests/fixtures/shop-page-biedronka.html', 'utf8')
+
+describe('shopMetaToLeaflets', () => {
+  const leaflets = shopMetaToLeaflets(
+    'biedronka', parseShopMeta(html), 'https://example.test',
+  )
+
+  it('produces one leaflet per listing entry', () => {
+    expect(leaflets).toHaveLength(4)
+    expect(new Set(leaflets.map((l) => l.shopSlug))).toEqual(new Set(['biedronka']))
   })
 
-  it('stops at the first empty page', async () => {
-    let calls = 0
-    const out = await collectPages(async () => { calls++; return [] })
-    expect(calls).toBe(1)
-    expect(out).toEqual([])
-  })
-
-  it('respects the page cap', async () => {
-    let calls = 0
-    await collectPages(async () => { calls++; return [{}] }, 3)
-    expect(calls).toBe(3)
-  })
-})
-
-const items = JSON.parse(
-  readFileSync('tests/fixtures/media-2026-08-12.json', 'utf8'),
-) as unknown[]
-
-describe('parseMediaItems', () => {
-  it('keeps only allowlisted shops', () => {
-    const out = parseMediaItems(items, ['biedronka', 'lidl', 'kaufland'])
-    expect(out.length).toBeGreaterThan(0)
-    for (const l of out) {
-      expect(['biedronka', 'lidl', 'kaufland']).toContain(l.shopSlug)
-    }
-  })
-
-  it('derives the shop from link, not from the filename prefix', () => {
-    const out = parseMediaItems(
-      [{
-        id: 1,
-        date: '2026-08-12T10:17:04',
-        link: 'https://www.gazetkipromocyjne.net/lidl/attachment/0__abc/',
-        source_url: 'https://www.gazetkipromocyjne.net/wp-content/uploads/pdf/0__abc.pdf',
-        post: 0,
-      }],
-      ['lidl'],
+  it('uses the pdf file stem as the external id and builds its url', () => {
+    const l = leaflets.find((x) => x.externalId === '4__6a7c1f3ae960d')!
+    expect(l.pdfUrl).toBe(
+      'https://example.test/wp-content/uploads/pdf/4__6a7c1f3ae960d.pdf',
     )
-    expect(out).toEqual([{
-      shopSlug: 'lidl',
-      externalId: '1',
-      pdfUrl: 'https://www.gazetkipromocyjne.net/wp-content/uploads/pdf/0__abc.pdf',
-      publishedAt: new Date('2026-08-12T10:17:04'),
-      coverUrl: null, validFrom: null, validTo: null, pageCount: null,
-    }])
   })
 
-  it('skips items whose link has no shop slug', () => {
-    expect(parseMediaItems(
-      [{
-        id: 2, date: '2026-08-12T10:00:00',
-        link: 'https://www.gazetkipromocyjne.net/attachment/x/',
-        source_url: 'https://example.test/x.pdf', post: 0,
-      }],
-      ['lidl'],
-    )).toEqual([])
+  it('carries validity dates and page count through', () => {
+    const l = leaflets.find((x) => x.externalId === '4__6a7c1f3ae960d')!
+    expect(l.validFrom!.toISOString().slice(0, 10)).toBe('2026-08-12')
+    expect(l.validTo!.toISOString().slice(0, 10)).toBe('2026-08-19')
+    expect(l.pageCount).toBe(84)
   })
 
-  it('reads the cover thumbnail when present', () => {
-    const out = parseMediaItems(
-      [{
-        id: 3, date: '2026-08-12T10:00:00',
-        link: 'https://www.gazetkipromocyjne.net/biedronka/attachment/y/',
-        source_url: 'https://example.test/y.pdf',
-        media_details: { sizes: { full: { source_url: 'https://example.test/y-pdf.jpg' } } },
-      }],
-      ['biedronka'],
-    )
-    expect(out[0]!.coverUrl).toBe('https://example.test/y-pdf.jpg')
+  it('anchors publishedAt to the start of validity', () => {
+    // The listing page has no publication timestamp, and the start of validity
+    // is what the year inference needs when a page prints "12.08" bare.
+    for (const l of leaflets) expect(l.publishedAt).toEqual(l.validFrom)
+  })
+
+  it('returns nothing for markup it does not recognise', () => {
+    expect(shopMetaToLeaflets('lidl', parseShopMeta('<html></html>'))).toEqual([])
   })
 })

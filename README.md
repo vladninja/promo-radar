@@ -56,17 +56,22 @@ pipeline is not locked to one vision provider.
 
 ## How it works
 
-1. **Discover** — `GET /wp-json/wp/v2/media?mime_type=application/pdf&after=<cursor>`.
-   The shop comes from the attachment `link` (`…/biedronka/attachment/…`); the
-   filename prefix is unreliable. One listing page per shop then supplies each
-   leaflet's validity dates and often its page count, paired to the PDF in the
-   same markup.
+1. **Discover** — one `GET /<shop>/` per shop. The listing page pairs each PDF
+   with its validity dates (in the download anchor) and usually its page count
+   (in the viewer iframe), so a leaflet is identified by its PDF file stem, e.g.
+   `4__6a7c1f3ae960d`. Three requests, no pagination, no cursor.
+
+   The `wp-json/wp/v2/media` endpoint was used for this and was dropped: it
+   carries no validity dates, so it forced a walk of the whole 223-PDF archive
+   plus a cursor to keep the volume down — and it returned exactly the same 19
+   current leaflets. Its only extra was a publication timestamp, which the
+   validity dates make redundant.
 2. **Keep only what is on offer today** — `valid_from <= today <= valid_to`.
    Expired leaflets are dropped, and so are ones not yet started: shops publish
-   next week's leaflet days early, and it is parsed on the day it begins. The
-   cursor is held just behind any skipped future leaflet so it stays
-   discoverable. Nothing already parsed is parsed again (`file_hash`, per-page
-   status, and page-image hashes).
+   next week's leaflet days early, and it is parsed on the day it begins.
+   Because discovery re-reads the listing pages every run, a deferred leaflet
+   simply reappears when it becomes current. Nothing already parsed is parsed
+   again (`file_hash`, per-page status, and page-image hashes).
 3. **Acquire** — download at 1 req/s, content-hash, store under `storage/pdf/`.
 4. **Rasterize** — `pdftoppm -r 110 -jpeg` per page.
 5. **Extract** — one vision call per page returning schema-validated offer tiles.
@@ -174,11 +179,11 @@ once as two overlapping halves on `gpt-5.6-terra`. Only those pages cost double.
 
 ## Operational notes
 
-- The source keeps only about a week of PDFs (`x-wp-total` ≈ 224 against ~30
-  published a day). **Scan at least daily** or leaflets are lost. `storage/pdf`
-  is the archive.
-- `pnpm scan` exits non-zero when no new leaflets have appeared for 36 hours
-  (the source probably changed) or when any page failed to extract.
+- The shop pages list only current and near-future leaflets, and the site keeps
+  roughly a week of PDFs. **Scan at least daily** or leaflets are lost;
+  `storage/pdf` is the archive.
+- `pnpm scan` exits non-zero when the listing pages yield no current leaflets at
+  all (the source probably changed) or when any page failed to extract.
 - Prices are integer grosze everywhere. Unit prices are normalized at parse time
   to per kg, per l or per piece, so pack sizes compare honestly.
 - Pages are extracted sequentially. That keeps the page budget exact and

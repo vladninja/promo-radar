@@ -21,7 +21,7 @@ const source = sources['gazetkipromocyjne']!
 const arg = process.argv[2]
 
 try {
-  const found = await source.discover(config.shopAllowlist, null)
+  const found = await source.discover(config.shopAllowlist)
   const now = new Date()
   const current = found.filter((d) =>
     d.validFrom && d.validTo ? d.validFrom <= now && d.validTo >= now : true,
