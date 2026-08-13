@@ -82,7 +82,15 @@ pipeline is not locked to one vision provider.
 6. **Resolve dates** — the leaflet states its own precedence: dates printed on an
    offer beat dates printed on the page. The year comes from `NR nn/YYYY`.
 7. **Match** — canonical key, then `pg_trgm` similarity within the same unit and
-   ±5% size.
+   ±5% size. Both are built from a stemmed name, because Polish inflects the
+   words that identify a product: Biedronka prints "Ogórek gruntowy", Kaufland
+   "Ogórki gruntowe", and the trigram between them scores 0.52 — under the 0.55
+   attach threshold, so one cucumber became two products and the comparison the
+   app exists for never happened. Two rules cover nearly all of it: the fleeting
+   e (ogórek → ogórk) and one final vowel of number or gender. Words of four
+   letters or fewer are left alone. Products keep the readable name for the page
+   and the stemmed one for the matcher; `pnpm tsx scripts/rescore.ts` re-keys the
+   archive for free when the rules change.
 
 ## Web UI
 

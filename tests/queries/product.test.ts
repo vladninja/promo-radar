@@ -13,6 +13,7 @@ beforeEach(async () => {
   await pool.query('truncate offers, leaflet_pages, leaflets, products, shops cascade')
   const [product] = await db.insert(products).values({
     canonicalKey: 'k|masło ekstra|200g', displayName: 'masło ekstra',
+    matchName: 'masł ekstr',
     brand: 'Mleczna Dolina', sizeValue: 200, sizeUnit: 'g',
   }).returning()
   productId = product!.id

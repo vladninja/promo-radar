@@ -26,10 +26,10 @@ beforeEach(async () => {
   await pool.query('truncate offers, leaflet_pages, leaflets, products, shops cascade')
 
   const [melon] = await db.insert(products).values({
-    canonicalKey: '|arbuzy|', displayName: 'arbuzy',
+    canonicalKey: '|arbuz|', displayName: 'arbuzy', matchName: 'arbuz',
   }).returning()
   const [plum] = await db.insert(products).values({
-    canonicalKey: '|sliwki|', displayName: 'śliwki',
+    canonicalKey: '|sliwk|', displayName: 'śliwki', matchName: 'śliwk',
   }).returning()
 
   const lidl = await leafletFor('lidl', 'L1')

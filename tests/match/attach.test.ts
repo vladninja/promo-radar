@@ -20,7 +20,7 @@ describe('attachToProduct', () => {
     })
     expect(r.method).toBe('new')
     expect(r.needsReview).toBe(false)
-    expect(r.canonicalKey).toBe('mleczna dolina|masło ekstra mleczna dolina|200g')
+    expect(r.canonicalKey).toBe('mleczna dolina|masł ekstr mleczn dolin|200g')
   })
 
   it('reuses the product on an exact canonical key', async () => {
@@ -82,6 +82,7 @@ describe('attachToProduct', () => {
     await db.insert(products).values({
       canonicalKey: 'x|chleb pszenny krojony|500g',
       displayName: 'chleb pszenny krojony',
+      matchName: 'chleb pszenn krojon',
       sizeValue: 500,
       sizeUnit: 'g',
     })

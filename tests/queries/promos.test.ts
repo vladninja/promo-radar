@@ -16,10 +16,11 @@ async function seed() {
   ]).returning()
   const [product] = await db.insert(products).values({
     canonicalKey: 'k|masło ekstra|200g',
-    displayName: 'masło ekstra', sizeValue: 200, sizeUnit: 'g',
+    displayName: 'masło ekstra', matchName: 'masł ekstr',
+    sizeValue: 200, sizeUnit: 'g',
   }).returning()
   const [other] = await db.insert(products).values({
-    canonicalKey: 'k|chleb|500g', displayName: 'chleb',
+    canonicalKey: 'k|chleb|500g', displayName: 'chleb', matchName: 'chleb',
   }).returning()
 
   for (const [i, shop] of shopRows.entries()) {

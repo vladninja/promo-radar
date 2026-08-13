@@ -59,7 +59,10 @@ export const leafletPages = pgTable('leaflet_pages', {
 export const products = pgTable('products', {
   id: uuid('id').primaryKey().defaultRandom(),
   canonicalKey: text('canonical_key').notNull().unique(),
+  /** Readable: what the product page shows. */
   displayName: text('display_name').notNull(),
+  /** Stemmed: what the trigram compares. See normalize/stem.ts. */
+  matchName: text('match_name').notNull(),
   brand: text('brand'),
   sizeValue: integer('size_value'),
   sizeUnit: sizeUnit('size_unit'),

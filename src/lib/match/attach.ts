@@ -3,6 +3,7 @@ import type { Db } from '@/lib/db/client'
 import { products } from '@/lib/db/schema'
 import { PRIVATE_LABELS, isCategoryPromo } from '@/lib/normalize/brands'
 import { canonicalKey, coreName } from '@/lib/normalize/canonical'
+import { matchName } from '@/lib/normalize/stem'
 import type { Size } from '@/lib/normalize/size'
 
 /** Brands compare on letters and digits only, so "Coca-Cola" meets "Coca Cola". */
@@ -39,6 +40,10 @@ export async function attachToProduct(
 ): Promise<MatchResult> {
   const key = canonicalKey(input)
   const core = coreName(input.name)
+  // Similarity has to see the same shape on both sides, so it runs on the
+  // stemmed form of each: comparing a stem against inflected Polish scores worse
+  // than comparing two inflected forms.
+  const stem = matchName(core)
   const brandKey = normalizeBrand(input.brand)
 
   // Similarity is only meaningful for things that could be the same product in
@@ -78,11 +83,11 @@ export async function attachToProduct(
       id: products.id,
       brand: products.brand,
       displayName: products.displayName,
-      score: sql<number>`similarity(${products.displayName}, ${core})`.as('score'),
+      score: sql<number>`similarity(${products.matchName}, ${stem})`.as('score'),
     })
     .from(products)
     .where(and(sizeFilter, brandFilter))
-    .orderBy(sql`similarity(${products.displayName}, ${core}) desc`)
+    .orderBy(sql`similarity(${products.matchName}, ${stem}) desc`)
     .limit(5)
 
   // The rule has to hold in both directions: an unbranded "Paluszki rybne" must
@@ -111,6 +116,7 @@ export async function attachToProduct(
     .values({
       canonicalKey: key,
       displayName: core,
+      matchName: stem,
       brand: input.brand,
       sizeValue: input.size?.value ?? null,
       sizeUnit: input.size?.unit ?? null,

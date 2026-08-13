@@ -19,4 +19,11 @@ export const STOPWORDS = [
   'mieszaj dowolnie',
   'pakowane próżniowo',
   'pakowana próżniowo',
+  // How loose produce is presented, which says nothing about what it is:
+  // Kaufland's "Nektarynki układane" is Lidl's "Nektarynki".
+  'układane',
+  'układana',
+  'kalibrowane',
+  'na tackach',
+  'w skrzynce',
 ]
