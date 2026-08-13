@@ -5,6 +5,7 @@ import {
 } from '@/lib/extract/dates'
 import type { PageResult } from '@/lib/extract/vision'
 import { attachToProduct } from '@/lib/match/attach'
+import { isCategoryPromo } from '@/lib/normalize/brands'
 import { coreName } from '@/lib/normalize/canonical'
 import { looksLikeTokenPrice, parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
 import { classifyCategory, isPetFood } from '@/lib/normalize/category'
@@ -123,6 +124,8 @@ export async function persistPageResult(
       unitPriceRaw: tokenPrice ? null : tile.unit_price_raw,
       requiresLoyalty: tile.requires_loyalty,
       requiresCoupon: tile.requires_coupon,
+      // The words name most of them; the model catches the ones they miss.
+      isGroup: tile.is_group || isCategoryPromo(coreName(tile.raw_name)),
       couponPoints: tile.coupon_points,
       purchaseLimit: tile.purchase_limit,
       // Pet food is the one place the rules overrule the model: it sits in the

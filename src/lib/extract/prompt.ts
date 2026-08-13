@@ -49,6 +49,12 @@ Page-level keys:
 
 Do not invent tiles for decorative images or for the shop's own logo.
 
+Some tiles advertise a shelf, not a product: "WSZYSTKIE PRODUKTY FINISH",
+"Wszystkie kosmetyki Nivea", "Antyperspiranty w spray'u Dove, 200 ml" — one
+picture standing for a whole range, usually with "drugi 70% taniej" and no price
+of its own. Set grp true for those. A tile naming one product in several
+flavours or colours is not a shelf: grp is false for "Serek Danio różne rodzaje".
+
 Some prices are not paid in money. A tile may carry a coin badge, "AKTYWUJ KUPON
 W APLIKACJI", "kupon w aplikacji", or a points cost written as "-1000". Set cpn
 true whenever such a marker appears, and put the number of points in pts when one

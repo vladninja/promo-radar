@@ -9,7 +9,7 @@ import { renderCrop } from '@/lib/acquire/crop'
 import { config } from '@/lib/config'
 import { getLeafletPage } from '@/lib/queries/leaflet'
 import {
-  getPromo, getSameProductElsewhere, getSimilarPromos,
+  getPromo, getGroupMembers, getSameProductElsewhere, getSimilarPromos,
 } from '@/lib/queries/promo'
 import { PromoView } from '@/server/views/promo'
 import { getProduct } from '@/lib/queries/product'
@@ -51,11 +51,16 @@ app.get('/api/promos', async (c) => c.json(await listPromos(db, promoFilters(c))
 app.get('/promos/:id', async (c) => {
   const promo = await getPromo(db, c.req.param('id'))
   if (!promo) return c.text('not found', 404)
-  const [elsewhere, similar] = await Promise.all([
-    getSameProductElsewhere(db, promo),
+  const [elsewhere, similar, members] = await Promise.all([
+    // A shelf offer is not a product, so there is no same-product-elsewhere to
+    // look for; what it covers is printed in its own leaflet instead.
+    promo.isGroup ? Promise.resolve([]) : getSameProductElsewhere(db, promo),
     getSimilarPromos(db, promo),
+    getGroupMembers(db, promo),
   ])
-  return c.html(<PromoView promo={promo} elsewhere={elsewhere} similar={similar} />)
+  return c.html(
+    <PromoView promo={promo} elsewhere={elsewhere} similar={similar} members={members} />,
+  )
 })
 
 // One promo tile, cropped out of its leaflet page and cached on disk.

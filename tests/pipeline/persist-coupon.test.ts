@@ -21,7 +21,7 @@ function tile(over: Partial<OfferTile>): OfferTile {
     price: null, price_unit: null, price_before: null, price_regular: null,
     discount_percent: null, promo_kind: 'price', min_qty: null,
     unit_price_raw: null, requires_loyalty: false,
-    requires_coupon: false, coupon_points: null,
+    requires_coupon: false, coupon_points: null, is_group: false,
     purchase_limit: null, date_badge: null, category: 'nabial',
     bbox: { x: 0, y: 0, w: 0.2, h: 0.2 },
     ...over,

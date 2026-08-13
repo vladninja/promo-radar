@@ -48,6 +48,7 @@ export function PromoView(props: {
   promo: PromoDetail
   elsewhere: RelatedPromo[]
   similar: RelatedPromo[]
+  members: RelatedPromo[]
 }) {
   const p = props.promo
   const size = p.sizeValue ? `${p.sizeValue} ${p.sizeUnit}` : null
@@ -98,16 +99,21 @@ export function PromoView(props: {
             {[p.brand, size, CATEGORY_LABELS[p.category]].filter(Boolean).join(' · ')}
           </p>
 
-          <div class="pricebox">
+          <div class={p.isGroup ? 'pricebox group' : 'pricebox'}>
             <div>
-              <span class="big">{formatZl(p.priceGrosze)}</span>
+              <span class="big">
+                {p.isGroup && p.priceGrosze === null
+                  ? formatPromo(p.promoKind, p.minQty, p.discountPercent)
+                  : formatZl(p.priceGrosze)}
+              </span>
               {p.requiresLoyalty ? <span class="badge card-only">z kartą</span> : null}
               {p.requiresCoupon ? (
                 <span class="badge card-only">
                   kupon w aplikacji{p.couponPoints ? ` · ${p.couponPoints} pkt` : ''}
                 </span>
               ) : null}
-              {p.discountPercent !== null
+              {p.isGroup ? <span class="badge shelf">cała półka</span> : null}
+              {p.discountPercent !== null && !p.isGroup
                 ? <span class="badge best">-{p.discountPercent}%</span>
                 : null}
             </div>
@@ -154,6 +160,21 @@ export function PromoView(props: {
           ) : null}
         </div>
       </div>
+
+      {p.isGroup ? (
+        <p class="group-note">
+          Oferta obejmuje wiele produktów, a gazetka nie wymienia ich przy niej.
+          Poniżej produkty z tej samej gazetki, które prawdopodobnie są nią objęte.
+        </p>
+      ) : null}
+      <Strip
+        title={p.brand
+          ? `Produkty marki ${p.brand} w tej gazetce`
+          : `${CATEGORY_LABELS[p.category]} w tej gazetce`}
+        note="prawdopodobnie objęte tą ofertą"
+        items={props.members}
+        primary
+      />
 
       <Strip
         title="Ta sama rzecz w innych sklepach"

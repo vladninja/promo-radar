@@ -104,7 +104,9 @@ export function PromosView(props: {
                   </span>
                 </p>
                 <p class="tags">
-                  <span class={`badge kind ${r.promoKind}`}>{promoKindLabel(r.promoKind)}</span>
+                  {r.isGroup
+                    ? <span class="badge shelf">Cała półka</span>
+                    : <span class={`badge kind ${r.promoKind}`}>{promoKindLabel(r.promoKind)}</span>}
                   <span class="badge cat">{CATEGORY_LABELS[r.category]}</span>
                 </p>
               </div>

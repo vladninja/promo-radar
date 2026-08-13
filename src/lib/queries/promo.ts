@@ -1,6 +1,8 @@
 import { and, eq, gte, lte, ne, sql } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
-import { leaflets, offers, shops } from '@/lib/db/schema'
+import { leaflets, offers, products, shops } from '@/lib/db/schema'
+import { coreName } from '@/lib/normalize/canonical'
+import { matchName } from '@/lib/normalize/stem'
 import type { Category } from '@/lib/normalize/category'
 import { effectiveDiscount } from '@/lib/queries/sort'
 
@@ -27,6 +29,7 @@ export interface PromoDetail {
   minQty: number | null
   requiresLoyalty: boolean
   requiresCoupon: boolean
+  isGroup: boolean
   couponPoints: number | null
   purchaseLimit: string | null
   validFrom: Date | null
@@ -76,6 +79,7 @@ const detailColumns = {
   requiresLoyalty: offers.requiresLoyalty,
   requiresCoupon: offers.requiresCoupon,
   couponPoints: offers.couponPoints,
+  isGroup: offers.isGroup,
   purchaseLimit: offers.purchaseLimit,
   validFrom: offers.validFrom,
   validTo: offers.validTo,
@@ -206,6 +210,8 @@ export async function getSimilarPromos(
   now = new Date(),
   limit = 12,
 ): Promise<RelatedPromo[]> {
+  // The stemmed name of what is being viewed, to rank the aisle against.
+  const mine = matchName(coreName(promo.rawName))
   const rows = await db
     .select({
       offerId: offers.id,
@@ -221,8 +227,14 @@ export async function getSimilarPromos(
     .from(offers)
     .innerJoin(leaflets, eq(leaflets.id, offers.leafletId))
     .innerJoin(shops, eq(shops.id, leaflets.shopId))
+    .leftJoin(products, eq(products.id, offers.productId))
     .where(and(
       eq(offers.category, promo.category),
+      // Like with like. A shelf offer among products is a card with no price
+      // and nothing to compare; products among shelf offers are the aisle, not
+      // a shortlist. Viewed from a shelf offer, the other shelf offers in the
+      // aisle are exactly what is worth seeing next.
+      eq(offers.isGroup, promo.isGroup),
       ne(offers.id, promo.offerId),
       // "is distinct from" rather than <>: an unmatched offer has a null product
       // and <> would silently drop every one of them.
@@ -232,7 +244,14 @@ export async function getSimilarPromos(
       lte(offers.validFrom, now),
       gte(offers.validTo, now),
     ))
-    .orderBy(sql`${effectiveDiscount} desc nulls last`)
+    // Nearest first, then the best deal. An aisle is a coarse thing to be shown:
+    // looking at plums, the other plums are what is worth seeing, and ranking the
+    // whole of fruit and veg by discount buries them under cut-price cucumbers.
+    // Produce is where this matters most, because it carries no brand to group by.
+    .orderBy(sql`
+      case when ${mine} = '' then 0
+           else similarity(${products.matchName}, ${mine}) end desc nulls last,
+      ${effectiveDiscount} desc nulls last`)
     // Read wide, then collapse: taking twelve rows first would spend the strip
     // on repeat printings of three products.
     .limit(limit * 8)
@@ -254,4 +273,63 @@ export async function getSimilarPromos(
 /** Where the cropped tile for an offer lives. */
 export function cropUrl(offerId: string): string {
   return `/api/crop/${offerId}`
+}
+
+/**
+ * What a shelf offer probably covers.
+ *
+ * "WSZYSTKIE PRODUKTY FINISH — drugi 70% taniej" says nothing about which Finish
+ * products, because the leaflet prints them on its own pages. Membership is
+ * inferred, not stated: same leaflet, same brand where the offer names one, same
+ * aisle otherwise. That is a guess, and the heading on the page says so rather
+ * than claiming the shop promised it.
+ *
+ * Other shelf offers are excluded — a leaflet runs several at once, and one is
+ * not a member of another.
+ */
+export async function getGroupMembers(
+  db: Db,
+  promo: PromoDetail,
+  limit = 18,
+): Promise<RelatedPromo[]> {
+  if (!promo.isGroup) return []
+  const brand = promo.brand?.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '') ?? null
+
+  const rows = await db
+    .select({
+      offerId: offers.id,
+      productId: offers.productId,
+      shopSlug: shops.slug,
+      rawName: offers.rawName,
+      priceGrosze: offers.priceGrosze,
+      unitPriceGrosze: offers.unitPriceGrosze,
+      unitBasis: offers.unitBasis,
+      requiresLoyalty: offers.requiresLoyalty,
+      bbox: offers.bbox,
+    })
+    .from(offers)
+    .innerJoin(leaflets, eq(leaflets.id, offers.leafletId))
+    .innerJoin(shops, eq(shops.id, leaflets.shopId))
+    .where(and(
+      eq(offers.leafletId, promo.leafletId),
+      ne(offers.id, promo.offerId),
+      eq(offers.isGroup, false),
+      eq(offers.category, promo.category),
+      brand
+        ? sql`regexp_replace(lower(${offers.brand}), '[^[:alnum:]]+', '', 'g') = ${brand}`
+        : sql`true`,
+    ))
+    .orderBy(sql`${offers.priceGrosze} asc nulls last`)
+    .limit(limit * 4)
+
+  const seen = new Set<string>()
+  const out: RelatedPromo[] = []
+  for (const r of rows) {
+    const key = r.productId ?? r.rawName
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({ ...r, hasImage: isBox(r.bbox) })
+    if (out.length >= limit) break
+  }
+  return out
 }

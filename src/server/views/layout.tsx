@@ -162,6 +162,13 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .badge.kind.percent { background: #f5f3ff; border-color: #ddd6fe; color: #6d28d9; }
 .badge.kind.multibuy { background: #ecfeff; border-color: #a5f3fc; color: #0e7490; }
 .badge.kind.bogo { background: #ecfdf5; border-color: #a7f3d0; color: #047857; }
+/* An offer over a whole shelf: not a product, so not one of the mechanics. */
+.badge.shelf { background: #fff7ed; border-color: #fed7aa; color: #c2410c; font-weight: 550; }
+.pricebox.group .big { font-size: 1.35rem; }
+.group-note {
+  margin: 0 0 1rem; padding: .75rem 1rem; font-size: 13px; color: var(--muted-fg);
+  background: #fff7ed; border: 1px solid #fed7aa; border-radius: var(--radius);
+}
 
 /* Icons stand in for the labels they replace; each carries its own <title>.
    They ride on the price line: in the chip row they wrapped alone onto a

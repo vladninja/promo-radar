@@ -162,6 +162,28 @@ off three items, so sorting on the printed number put thirteen price-less bundle
 at the head of the list and every real bargain behind them; the sort spreads it
 over the bundle, and the card omits a percentage it would misstate.
 
+### Shelf offers
+
+Some tiles do not advertise a product. "WSZYSTKIE PRODUKTY FINISH — drugi 70%
+taniej" is an offer over a whole shelf, and the things it covers are printed
+elsewhere in the same leaflet. Treated as a product it is a card with no price,
+no unit price and nothing to compare against another shop.
+
+They are flagged `is_group` and get their own treatment: a `Cała półka` chip on
+the card, a detail page headed by the mechanic rather than by a price it does not
+have, no same-product-elsewhere section, and a strip of the products from that
+leaflet the offer probably covers — same brand where it names one, same aisle
+otherwise. Membership is inferred, not stated, and the page says so instead of
+claiming the shop promised it.
+
+The similar-promotions strip keeps to one kind: a shelf offer among products is a
+card with no price, and products among shelf offers are the aisle rather than a
+shortlist.
+
+The wording names most of them (`wszystkie ...`), which is what the backfill
+used. The model marks the rest as it reads the page — "Antyperspiranty w spray'u
+Dove, 200 ml" is a shelf too, and no regex was going to know that.
+
 ### How two offers are compared
 
 Per unit when both sides print one on the same basis; otherwise on the shelf

@@ -91,6 +91,8 @@ export const offers = pgTable('offers', {
    *  Such a price is not available to a shopper who has none, so it must not be
    *  compared against a shelf price. */
   requiresCoupon: boolean('requires_coupon').notNull().default(false),
+  /** An offer over a whole shelf rather than one product. See views/promo.tsx. */
+  isGroup: boolean('is_group').notNull().default(false),
   couponPoints: integer('coupon_points'),
   purchaseLimit: text('purchase_limit'),
   category: category('category').notNull().default('inne'),

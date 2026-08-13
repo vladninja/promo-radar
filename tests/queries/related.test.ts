@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
-import { getPromo, getSameProductElsewhere, getSimilarPromos } from '@/lib/queries/promo'
+import {
+  getGroupMembers, getPromo, getSameProductElsewhere, getSimilarPromos,
+} from '@/lib/queries/promo'
 import { leaflets, offers, products, shops } from '@/lib/db/schema'
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_TEST })
@@ -97,5 +99,63 @@ describe('getSameProductElsewhere', () => {
     expect(elsewhere).toHaveLength(1)
     expect(elsewhere[0]!.shopSlug).toBe('biedronka')
     expect(elsewhere[0]!.priceGrosze).toBe(299)   // not the 3,49 printing
+  })
+})
+
+describe('a shelf offer', () => {
+  /** One leaflet: a Finish shelf offer, two products, and a second shelf offer. */
+  async function seedShelf() {
+    await pool.query('truncate offers, leaflets, products, shops cascade')
+    const biedronka = await leafletFor('biedronka', 'B2')
+    const [group] = await db.insert(offers).values({
+      leafletId: biedronka, pageNo: 19, rawName: 'WSZYSTKIE PRODUKTY FINISH',
+      name: 'wszystkie produkty finish', brand: 'Finish',
+      priceGrosze: null, promoKind: 'percent', discountPercent: 70,
+      isGroup: true, category: 'chemia-higiena' as const,
+      validFrom: FROM, validTo: TO, dateSource: 'offer' as const,
+    }).returning()
+
+    await db.insert(offers).values([
+      {
+        leafletId: biedronka, pageNo: 20, rawName: 'Kapsułki do zmywarki Finish, 100 szt.',
+        name: 'kapsułki finish', brand: 'Finish', priceGrosze: 7699,
+        promoKind: 'price' as const, category: 'chemia-higiena' as const,
+        validFrom: FROM, validTo: TO, dateSource: 'offer' as const,
+      },
+      {
+        leafletId: biedronka, pageNo: 21, rawName: 'Płyn do prania Vizir, 2 l',
+        name: 'płyn vizir', brand: 'Vizir', priceGrosze: 2499,
+        promoKind: 'price' as const, category: 'chemia-higiena' as const,
+        validFrom: FROM, validTo: TO, dateSource: 'offer' as const,
+      },
+      // Another shelf offer in the same leaflet is not a member of this one.
+      {
+        leafletId: biedronka, pageNo: 22, rawName: 'WSZYSTKIE PRODUKTY FINISH POWER',
+        name: 'wszystkie produkty finish power', brand: 'Finish', priceGrosze: null,
+        promoKind: 'percent' as const, isGroup: true,
+        category: 'chemia-higiena' as const,
+        validFrom: FROM, validTo: TO, dateSource: 'offer' as const,
+      },
+    ])
+    return (await getPromo(db, group!.id))!
+  }
+
+  it('lists the products of its brand printed in the same leaflet', async () => {
+    const promo = await seedShelf()
+    expect(promo.isGroup).toBe(true)
+    const members = await getGroupMembers(db, promo)
+    expect(members.map((m) => m.rawName)).toEqual(['Kapsułki do zmywarki Finish, 100 szt.'])
+  })
+
+  it('has no same-product-elsewhere to offer', async () => {
+    const promo = await seedShelf()
+    expect(promo.productId).toBeNull()
+    expect(await getSameProductElsewhere(db, promo, NOW)).toHaveLength(0)
+  })
+
+  it('keeps company with other shelf offers, not with products', async () => {
+    const promo = await seedShelf()
+    const similar = await getSimilarPromos(db, promo, NOW)
+    expect(similar.map((s) => s.rawName)).toEqual(['WSZYSTKIE PRODUKTY FINISH POWER'])
   })
 })

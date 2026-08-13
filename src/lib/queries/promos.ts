@@ -27,6 +27,7 @@ export interface PromoRow {
   minQty: number | null
   discountPercent: number | null
   requiresLoyalty: boolean
+  isGroup: boolean
   needsReview: boolean
   category: Category
   validFrom: Date | null
@@ -71,6 +72,7 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
       minQty: offers.minQty,
       discountPercent: offers.discountPercent,
       requiresLoyalty: offers.requiresLoyalty,
+      isGroup: offers.isGroup,
       needsReview: offers.needsReview,
       category: offers.category,
       validFrom: offers.validFrom,

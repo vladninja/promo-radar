@@ -24,6 +24,9 @@ export const OfferTileSchema = z.object({
    *  readings taken before the field existed still parse. */
   requires_coupon: z.boolean().default(false),
   coupon_points: z.number().int().nullable().default(null),
+  /** The tile covers a range of products, not one: "wszystkie produkty Finish".
+   *  Defaulted so readings taken before the field existed still parse. */
+  is_group: z.boolean().default(false),
   purchase_limit: z.string().nullable(),
   date_badge: z.string().nullable(),
   /** Aisle this promotion belongs to. Defaulted so readings made before
@@ -70,6 +73,7 @@ export const WireTileSchema = z.object({
   l: z.boolean(),                      // loyalty card required
   cpn: z.boolean(),                    // price needs a coupon activated in the app
   pts: z.number().int().nullable(),    // points the coupon costs, e.g. 1000
+  grp: z.boolean(),                    // covers a whole shelf, not one product
   lim: z.string().nullable(),          // purchase limit
   dt: z.string().nullable(),           // dates only, e.g. "12.08-14.08"
   c: z.enum(CATEGORIES),               // aisle
@@ -104,6 +108,7 @@ export function toPageResult(w: WirePage): PageResult {
       requires_loyalty: t.l,
       requires_coupon: t.cpn,
       coupon_points: t.pts,
+      is_group: t.grp,
       purchase_limit: t.lim,
       date_badge: t.dt,
       category: t.c,
