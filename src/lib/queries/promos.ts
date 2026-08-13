@@ -1,7 +1,7 @@
-import { and, eq, gte, lte, sql, type SQL } from 'drizzle-orm'
+import { and, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { leaflets, offers, shops } from '@/lib/db/schema'
-import type { Category } from '@/lib/normalize/category'
+import { FOOD_CATEGORIES, type Category } from '@/lib/normalize/category'
 
 export interface PromoFilters {
   q?: string
@@ -9,6 +9,7 @@ export interface PromoFilters {
   crossShopOnly?: boolean
   needsReview?: boolean
   category?: Category
+  foodOnly?: boolean
   sort?: 'discount' | 'unit'
   now?: Date
 }
@@ -49,6 +50,7 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
   if (f.q) where.push(sql`${offers.rawName} ilike ${'%' + f.q + '%'}`)
   if (f.needsReview) where.push(eq(offers.needsReview, true))
   if (f.category) where.push(eq(offers.category, f.category))
+  if (f.foodOnly) where.push(inArray(offers.category, [...FOOD_CATEGORIES]))
   if (f.crossShopOnly) where.push(sql`${shopCount} > 1`)
 
   const order = f.sort === 'unit'
@@ -79,7 +81,10 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
     .innerJoin(shops, eq(shops.id, leaflets.shopId))
     .where(and(...where))
     .orderBy(order)
-    .limit(300)
+    // Generous, because merging happens below in JS: a limit applied here would
+    // truncate before duplicates collapse, so the count shown would be wrong and
+    // the tail of the list silently missing. Paging is done on merged rows.
+    .limit(5000)
 
   // A leaflet prints its headline offers on the cover and again in the section,
   // so the same promotion arrives twice. That is one promotion, not two: merge on
@@ -111,4 +116,30 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
     merged.set(key, cheaper)
   }
   return [...merged.values()]
+}
+
+export interface PromoPage {
+  rows: PromoRow[]
+  total: number
+  page: number
+  pages: number
+}
+
+export const PAGE_SIZE = 60
+
+/** One screen of promotions, paged after merging so the totals are honest. */
+export async function listPromoPage(
+  db: Db,
+  f: PromoFilters,
+  page = 1,
+): Promise<PromoPage> {
+  const all = await listPromos(db, f)
+  const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE))
+  const current = Math.min(Math.max(1, page), pages)
+  return {
+    rows: all.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
+    total: all.length,
+    page: current,
+    pages,
+  }
 }

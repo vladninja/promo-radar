@@ -58,8 +58,29 @@ const RULES: Array<[Category, RegExp]> = [
   ['slodycze-przekaski', /\b(czekolad\w*|batonik\w*|cukierk\w*|ciastk\w*|wafl\w*|chips\w*|paluszki\b|orzeszk\w*|słodycz\w*|milka|delicje|prince)\b/i],
   ['chemia-higiena', /\b(papier toaletowy|ręcznik\w* (papierow|kuchenn)\w*|proszek|płyn do|mydł\w*|szampon\w*|pasta do zębów|chust\w*|pieluch\w*|detergent\w*|floralys)\b/i],
   ['dom-ogrod', /\b(mebl\w*|fotel\w*|leżak\w*|huśtawk\w*|grill\b|donic\w*|kwiat\w*|wrzos\w*|lawend\w*|fikus\w*|rower\w*|trampolin\w*|domek dla dzieci|garnk\w*|krzesł\w*|robot koszący)\b/i],
-  ['spozywcze', /\b(ketchup\w*|majonez\w*|musztard\w*|sos\w*|makaron\w*|ryż|mąk[aęi]|cukier|olej|ocet|przypraw\w*|konserw\w*|hummus\w*|oliwk\w*|antipasti|guacamole|kiszon\w*)\b/i],
+  // Pet food reads as meat or dairy on keywords alone; it is not groceries.
+  ['inne', /\b(karma|karmy|dla ps[aó]w?|dla kot[aów]+|przysmak dla)\b/i],
+  ['spozywcze', /\b(ketchup\w*|majonez\w*|musztard\w*|sos\w*|makaron\w*|ryż|mąk[aęi]|cukier|olej|ocet|przypraw\w*|konserw\w*|hummus\w*|oliwk\w*|antipasti|guacamole|kiszon\w*|vital fresh|d[zż]em\w*|miód|kasz[aey]|płatk[iu]|herbatnik\w*)\b/i],
 ]
+
+/**
+ * Categories a food shopper actually wants. Everything else in a leaflet —
+ * garden furniture, washing powder, back-to-school stationery, pet food — is a
+ * third of the promotions in August and drowns the groceries.
+ *
+ * 'inne' counts as non-food deliberately: it is where the classifier gives up,
+ * and in practice holds stationery, clothing and pet food rather than groceries.
+ * A food item landing there is hidden by this filter, which is the incentive to
+ * keep the rules below honest.
+ */
+export const FOOD_CATEGORIES: readonly Category[] = [
+  'owoce-warzywa', 'mieso-wedliny', 'ryby', 'nabial', 'pieczywo',
+  'napoje', 'alkohol', 'slodycze-przekaski', 'mrozonki', 'spozywcze',
+]
+
+export function isFoodCategory(c: Category): boolean {
+  return FOOD_CATEGORIES.includes(c)
+}
 
 export function classifyCategory(name: string): Category {
   for (const [category, pattern] of RULES) {

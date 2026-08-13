@@ -13,7 +13,7 @@ import {
 } from '@/lib/queries/promo'
 import { PromoView } from '@/server/views/promo'
 import { getProduct } from '@/lib/queries/product'
-import { listPromos, type PromoFilters } from '@/lib/queries/promos'
+import { listPromos, listPromoPage, type PromoFilters } from '@/lib/queries/promos'
 import { CATEGORIES, type Category } from '@/lib/normalize/category'
 import { LeafletView } from '@/server/views/leaflet'
 import { ProductView } from '@/server/views/product'
@@ -28,6 +28,7 @@ function promoFilters(c: Context): PromoFilters {
     shop: q.shop || undefined,
     crossShopOnly: q.cross === '1',
     needsReview: q.review === '1',
+    foodOnly: q.food === '1',
     category: (CATEGORIES as readonly string[]).includes(q.category ?? '')
       ? (q.category as Category)
       : undefined,
@@ -40,7 +41,9 @@ app.get('/favicon.ico', (c) => c.body(null, 204))
 
 app.get('/', async (c) => {
   const filters = promoFilters(c)
-  return c.html(<PromosView rows={await listPromos(db, filters)} filters={filters} />)
+  const page = Number(c.req.query('page') ?? '1')
+  const result = await listPromoPage(db, filters, Number.isFinite(page) ? page : 1)
+  return c.html(<PromosView result={result} filters={filters} query={c.req.query()} />)
 })
 
 app.get('/api/promos', async (c) => c.json(await listPromos(db, promoFilters(c))))

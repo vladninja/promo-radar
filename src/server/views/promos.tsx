@@ -1,6 +1,6 @@
 import { Layout } from '@/server/views/layout'
 import { formatPromo, formatRange, formatUnitPrice, formatZl } from '@/lib/format'
-import type { PromoFilters, PromoRow } from '@/lib/queries/promos'
+import type { PromoFilters, PromoPage } from '@/lib/queries/promos'
 import { CATEGORIES, CATEGORY_LABELS } from '@/lib/normalize/category'
 
 const SHOPS = [
@@ -10,17 +10,28 @@ const SHOPS = [
   ['kaufland', 'Kaufland'],
 ] as const
 
-export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
-  const { rows, filters } = props
+export function PromosView(props: {
+  result: PromoPage
+  filters: PromoFilters
+  query: Record<string, string>
+}) {
+  const { filters } = props
+  const { rows, total, page, pages } = props.result
   const shops = new Set(rows.map((r) => r.shopSlug)).size
   const crossShop = rows.filter((r) => r.shopCount > 1).length
+  const linkTo = (n: number) => {
+    const q = new URLSearchParams(props.query)
+    q.set('page', String(n))
+    return `/?${q}`
+  }
 
   return (
     <Layout title="Promocje — Promo Radar">
       <h1>Promocje</h1>
       <p class="sub">
-        {rows.length} promocji w {shops} sklepach
-        {crossShop > 0 ? ` · ${crossShop} dostępnych w kilku sklepach` : ''}
+        {total} promocji w {shops} sklepach
+        {crossShop > 0 ? ` · ${crossShop} na tej stronie w kilku sklepach` : ''}
+        {pages > 1 ? ` · strona ${page} z ${pages}` : ''}
       </p>
 
       <form class="filters" method="get" action="/">
@@ -40,6 +51,10 @@ export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
           <option value="discount" selected={filters.sort !== 'unit'}>Największa zniżka</option>
           <option value="unit" selected={filters.sort === 'unit'}>Cena za jednostkę</option>
         </select>
+        <label class="check">
+          <input type="checkbox" name="food" value="1" checked={filters.foodOnly} />
+          Tylko jedzenie
+        </label>
         <label class="check">
           <input type="checkbox" name="cross" value="1" checked={filters.crossShopOnly} />
           W kilku sklepach
@@ -90,6 +105,14 @@ export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
           ))}
         </div>
       )}
+
+      {pages > 1 ? (
+        <nav class="pager pages">
+          {page > 1 ? <a href={linkTo(page - 1)}>← poprzednia</a> : null}
+          <span class="muted">strona {page} z {pages}</span>
+          {page < pages ? <a href={linkTo(page + 1)}>następna →</a> : null}
+        </nav>
+      ) : null}
     </Layout>
   )
 }

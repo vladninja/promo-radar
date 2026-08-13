@@ -107,6 +107,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
   position: absolute; border: 2px solid var(--accent); border-radius: 3px;
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
+.pager.pages { justify-content: center; margin-top: 1.25rem; }
 .pager { display: flex; gap: .75rem; align-items: center; margin: 0 0 1rem; font-size: 13px; }
 
 
