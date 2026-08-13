@@ -16,6 +16,7 @@ export const PRIVATE_LABELS = new Set([
   'vitalfresh',
   'smacznego',
   'govege',
+  'mojakurka',
   // Lidl
   'pikok',
   'floralys',
