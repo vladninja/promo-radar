@@ -54,6 +54,13 @@ describe('parseBadgeWithin', () => {
     expect(r.to.toISOString().slice(0, 10)).toBe('2026-08-14')
   })
 
+  it('keeps a one-day offer to that day', () => {
+    // Lidl runs Friday-only deals inside a three-day leaflet.
+    const r = parseBadgeWithin('Tylko w piątek, 14.08', 2026, leafletTo)!
+    expect(r.from.toISOString().slice(0, 10)).toBe('2026-08-14')
+    expect(r.to.toISOString().slice(0, 10)).toBe('2026-08-14')
+  })
+
   it('ignores a start that falls after the leaflet has ended', () => {
     expect(parseBadgeWithin('OD 25.09', 2026, leafletTo)).toBeNull()
   })

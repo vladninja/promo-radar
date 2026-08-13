@@ -35,10 +35,24 @@ export function parseBadgeWithin(
 ): DateRange | null {
   const both = parseDateBadge(text, anchorYear)
   if (both) return both
-  const m = text.match(/\bod\b[^0-9]{0,24}(\d{1,2})[.,](\d{1,2})(?!\s*[.,]?\s*\d)/i)
-  if (!m) return null
-  const from = new Date(Date.UTC(anchorYear, Number(m[2]) - 1, Number(m[1])))
-  return from <= leafletTo ? { from, to: leafletTo } : null
+
+  const one = text.match(/(\d{1,2})[.,](\d{1,2})(?!\s*[.,]?\s*\d)/)
+  if (!one) return null
+  const day = new Date(Date.UTC(anchorYear, Number(one[2]) - 1, Number(one[1])))
+
+  // "Tylko w piątek, 14.08" is a one-day offer. Letting it inherit the page or
+  // leaflet range would advertise a Friday-only price all week.
+  if (/\btylko\b/i.test(text)) {
+    return {
+      from: day,
+      to: new Date(day.getTime() + 24 * 3600 * 1000 - 1000),
+    }
+  }
+  // "OD ŚRODY 12.08" runs from that day until the leaflet ends.
+  if (/\bod\b/i.test(text)) {
+    return day <= leafletTo ? { from: day, to: leafletTo } : null
+  }
+  return null
 }
 
 export function resolveDates(
