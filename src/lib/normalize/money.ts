@@ -25,6 +25,23 @@ const BASES: Array<[RegExp, UnitBasis, number]> = [
   [/\/\s*(szt|rolka|rolki|opak|sztuk)/i, 'pcs', 1],
 ]
 
+/**
+ * A token price bought with loyalty points, not money: shops print "0,01" beside
+ * "aktywuj kupon" and a points cost. It is not a price a shopper can pay, and
+ * left alone it makes a yoghurt look like the cheapest thing in Poland.
+ */
+export function looksLikeTokenPrice(
+  grosze: number | null,
+  reference: number | null,
+): boolean {
+  if (grosze === null) return false
+  // Nothing in a grocery leaflet costs five grosze. The coupon prices seen so
+  // far print no reference price at all, so a ratio test alone misses them.
+  if (grosze <= 5) return true
+  // Higher token prices give themselves away by sitting beside the real one.
+  return grosze <= 20 && reference !== null && reference > grosze * 20
+}
+
 /** Parses a unit price and normalizes it to per kg, per l or per piece. */
 export function parseUnitPrice(raw: string): UnitPrice | null {
   if (!raw) return null

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
+import { looksLikeTokenPrice, parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
 
 describe('parseGrosze', () => {
   const cases: Array<[string, number | null]> = [
@@ -38,5 +38,29 @@ describe('parseUnitPrice', () => {
   })
   it('returns null when there is no unit', () => {
     expect(parseUnitPrice('7,99')).toBeNull()
+  })
+})
+
+describe('looksLikeTokenPrice', () => {
+  it('spots a points-coupon price sitting beside the real one', () => {
+    // Kaufland prints "0,01" with "aktywuj kupon" and -1000 points next to a
+    // 5,99 promotional price on the same tile.
+    expect(looksLikeTokenPrice(1, 899)).toBe(true)
+    expect(looksLikeTokenPrice(1, 599)).toBe(true)
+  })
+
+  it('leaves ordinary cheap things alone', () => {
+    expect(looksLikeTokenPrice(49, 69)).toBe(false)    // 0,49 bread roll
+    expect(looksLikeTokenPrice(149, 599)).toBe(false)  // 1,49 watermelon per kg
+  })
+
+  it('catches a coupon price that prints no reference at all', () => {
+    // The Danio and Oshee tiles gave 0,01 and nothing else; a ratio test alone
+    // would have let both through.
+    expect(looksLikeTokenPrice(1, null)).toBe(true)
+  })
+
+  it('leaves a plausible few-grosze item alone', () => {
+    expect(looksLikeTokenPrice(19, null)).toBe(false)   // 0,19 pencil sharpener
   })
 })

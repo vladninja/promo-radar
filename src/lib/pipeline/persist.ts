@@ -6,7 +6,7 @@ import {
 import type { PageResult } from '@/lib/extract/vision'
 import { attachToProduct } from '@/lib/match/attach'
 import { coreName } from '@/lib/normalize/canonical'
-import { parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
+import { looksLikeTokenPrice, parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
 import { classifyCategory, isPetFood } from '@/lib/normalize/category'
 import { extractSize } from '@/lib/normalize/size'
 
@@ -88,11 +88,20 @@ export async function persistPageResult(
       brand: tile.brand, name: tile.raw_name, size,
     })
 
+    // A points-coupon price would otherwise sit at the top of every "cheapest"
+    // list. Keep the number — it is what the page says — but do not let it pass
+    // as an ordinary price unnoticed.
+    const price = tile.price ? parseGrosze(tile.price) : null
+    const reference =
+      (tile.price_before ? parseGrosze(tile.price_before) : null) ??
+      (tile.price_regular ? parseGrosze(tile.price_regular) : null)
+    const tokenPrice = looksLikeTokenPrice(price, reference)
+
     await db.insert(offers).values({
       leafletId, pageNo,
       rawName: tile.raw_name, brand: tile.brand, name: coreName(tile.raw_name),
       sizeValue: size?.value ?? null, sizeUnit: size?.unit ?? null,
-      priceGrosze: tile.price ? parseGrosze(tile.price) : null,
+      priceGrosze: price,
       priceBefore: tile.price_before ? parseGrosze(tile.price_before) : null,
       priceRegular: tile.price_regular ? parseGrosze(tile.price_regular) : null,
       discountPercent: tile.discount_percent,
@@ -112,6 +121,7 @@ export async function persistPageResult(
       matchMethod: match.method, matchScore: match.score,
       needsReview:
         match.needsReview ||
+        tokenPrice ||
         (dateSrc === 'leaflet' && args.leafletRangeIsGuess === true),
       bbox: tile.bbox,
     })
