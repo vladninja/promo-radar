@@ -53,7 +53,8 @@ function fakeVision(counter: { calls: number }): VisionClient {
           tiles: [{
             raw_name: 'Masło Ekstra Mleczna Dolina, 200 g',
             brand: 'Mleczna Dolina',
-            price: '1,99', price_before: null, price_regular: null,
+            price: '1,99', price_unit: null,
+            price_before: null, price_regular: null,
             discount_percent: 60, promo_kind: 'multibuy', min_qty: 3,
             unit_price_raw: '1,00 zł/100 g', requires_loyalty: true,
             purchase_limit: 'Limit dzienny 3 szt.',

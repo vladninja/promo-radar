@@ -5,6 +5,7 @@ const tile = (over: Partial<PageResult['tiles'][number]> = {}) => ({
   raw_name: 'Masło Ekstra Mleczna Dolina, 200 g',
   brand: 'Mleczna Dolina',
   price: '1,99',
+  price_unit: null,
   price_before: null,
   price_regular: null,
   discount_percent: 60,

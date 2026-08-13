@@ -35,7 +35,14 @@ export function ProductView(props: { product: ProductDetail }) {
               <td>{formatPromo(o.promoKind, o.minQty, o.discountPercent)}</td>
               <td>{formatRange(o.validFrom, o.validTo)}</td>
               <td class="muted">{o.purchaseLimit ?? '—'}</td>
-              <td><a href={`/leaflets/${o.leafletId}?page=${o.pageNo}`}>s. {o.pageNo}</a></td>
+              <td>
+                {o.pageNos.map((n, i) => (
+                  <>
+                    {i > 0 ? ', ' : ''}
+                    <a href={`/leaflets/${o.leafletId}?page=${n}`}>s. {n}</a>
+                  </>
+                ))}
+              </td>
             </tr>
           ))}
         </tbody>

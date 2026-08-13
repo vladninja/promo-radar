@@ -64,7 +64,14 @@ export async function persistPageResult(
       offerRange, pageRange, leafletRange,
     )
     const size = extractSize(tile.raw_name)
-    const unit = tile.unit_price_raw ? parseUnitPrice(tile.unit_price_raw) : null
+    // The unit printed against the main price is exact. The smaller per-100 g
+    // restatement is rounded, and scaling it up invents a grosz: a shelf price of
+    // 7,99 zł/kg is printed as "0,80 zł/100 g", which becomes 8,00 zł/kg.
+    const unit =
+      (tile.price && tile.price_unit
+        ? parseUnitPrice(`${tile.price} zł${tile.price_unit}`)
+        : null) ??
+      (tile.unit_price_raw ? parseUnitPrice(tile.unit_price_raw) : null)
     const match = await attachToProduct(db, {
       brand: tile.brand, name: tile.raw_name, size,
     })

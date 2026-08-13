@@ -7,6 +7,8 @@ export interface ProductOffer {
   shopSlug: string
   leafletId: string
   pageNo: number
+  /** Every page of this leaflet printing the same offer, ascending. */
+  pageNos: number[]
   rawName: string
   priceGrosze: number | null
   priceBefore: number | null
@@ -69,10 +71,37 @@ export async function getProduct(
       gte(offers.validTo, now),
     ))
 
+  // A leaflet prints its headline offers on the cover and again in the section,
+  // often with fuller detail the second time. That is one offer, not two, so the
+  // rows are merged: same shop, same price, same promotion, same dates.
+  const merged = new Map<string, typeof rows[number] & { pageNos: number[] }>()
+  for (const r of rows) {
+    const key = [
+      r.shopSlug, r.priceGrosze ?? 'x', r.promoKind, r.minQty ?? 'x',
+      r.requiresLoyalty, r.validFrom?.getTime() ?? 'x', r.validTo?.getTime() ?? 'x',
+    ].join('|')
+    const seen = merged.get(key)
+    if (!seen) {
+      merged.set(key, { ...r, pageNos: [r.pageNo] })
+      continue
+    }
+    seen.pageNos.push(r.pageNo)
+    seen.pageNos.sort((a, b) => a - b)
+    // Keep whichever printing told us more.
+    seen.priceBefore ??= r.priceBefore
+    seen.priceRegular ??= r.priceRegular
+    seen.discountPercent ??= r.discountPercent
+    seen.unitPriceGrosze ??= r.unitPriceGrosze
+    seen.unitBasis ??= r.unitBasis
+    seen.purchaseLimit ??= r.purchaseLimit
+    seen.pageNo = seen.pageNos[0]!
+  }
+  const deduped = [...merged.values()]
+
   // Cheapest is decided per unit basis, never across bases: a per-piece price
   // must not win against a per-kilogram one.
   const bestByBasis = new Map<string, number>()
-  for (const r of rows) {
+  for (const r of deduped) {
     if (r.unitBasis === null || r.unitPriceGrosze === null) continue
     const current = bestByBasis.get(r.unitBasis)
     if (current === undefined || r.unitPriceGrosze < current) {
@@ -86,7 +115,7 @@ export async function getProduct(
     brand: product.brand,
     sizeValue: product.sizeValue,
     sizeUnit: product.sizeUnit,
-    offers: rows.map((r) => ({
+    offers: deduped.map((r) => ({
       ...r,
       isCheapest:
         r.unitBasis !== null &&

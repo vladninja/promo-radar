@@ -4,6 +4,14 @@ export const OfferTileSchema = z.object({
   raw_name: z.string(),
   brand: z.string().nullable(),
   price: z.string().nullable(),
+  /**
+   * Unit printed against the main price, e.g. "/kg". Exact, unlike the rounded
+   * small print: a price of 7,99 /kg is restated as "0,80 zł/100 g".
+   *
+   * Defaulted rather than required, so page results recorded before this field
+   * existed — the golden fixture, and every stored raw_json — still parse.
+   */
+  price_unit: z.string().nullable().default(null),
   price_before: z.string().nullable(),
   price_regular: z.string().nullable(),
   discount_percent: z.number().int().nullable(),
@@ -37,6 +45,7 @@ export const WireTileSchema = z.object({
   n: z.string(),                       // name, as printed
   br: z.string().nullable(),           // brand
   p: z.string().nullable(),            // price
+  pu: z.string().nullable(),           // unit printed against the price, e.g. "/kg"
   pb: z.string().nullable(),           // price before the reduction
   pr: z.string().nullable(),           // regular / non-promotional price
   d: z.number().int().nullable(),      // discount percent
@@ -65,6 +74,7 @@ export function toPageResult(w: WirePage): PageResult {
       raw_name: t.n,
       brand: t.br,
       price: t.p,
+      price_unit: t.pu,
       price_before: t.pb,
       price_regular: t.pr,
       discount_percent: t.d,

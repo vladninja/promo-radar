@@ -13,6 +13,7 @@ Keys are deliberately short. Emit exactly these per tile:
     Include a comma only when a comma, a decimal point, or a raised/superscript
     grosze part is genuinely visible, e.g. "7,99" or "79,90".
     Null if the tile has no single price (for example "1+1 GRATIS").
+- pu: the unit printed immediately against the main price, exactly as shown: "/kg", "/l", "/szt.", "/100 g", "/rolka". Null when the price has no unit beside it. This is the exact figure; the smaller per-100 g line elsewhere on the tile is a rounded restatement of it.
 - pb: the crossed-out previous price, or the value labelled "Cena przed obniżką". Same digit rules as p.
     This one is printed small and struck through with a diagonal line, which hides digits.
     If you cannot read every digit with confidence, return null. A missing previous price
