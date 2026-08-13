@@ -7,7 +7,7 @@ import type { PageResult } from '@/lib/extract/vision'
 import { attachToProduct } from '@/lib/match/attach'
 import { coreName } from '@/lib/normalize/canonical'
 import { parseGrosze, parseUnitPrice } from '@/lib/normalize/money'
-import { classifyCategory } from '@/lib/normalize/category'
+import { classifyCategory, isPetFood } from '@/lib/normalize/category'
 import { extractSize } from '@/lib/normalize/size'
 
 export interface PersistArgs {
@@ -101,7 +101,12 @@ export async function persistPageResult(
       unitPriceRaw: tile.unit_price_raw,
       requiresLoyalty: tile.requires_loyalty,
       purchaseLimit: tile.purchase_limit,
-      category: tile.category ?? classifyCategory(tile.raw_name),
+      // Pet food is the one place the rules overrule the model: it sits in the
+      // food aisle, so the model files it as groceries, but nobody shopping for
+      // dinner wants it in their results.
+      category: isPetFood(tile.raw_name)
+        ? 'zwierzeta'
+        : tile.category ?? classifyCategory(tile.raw_name),
       validFrom: range.from, validTo: range.to, dateSource: dateSrc,
       canonicalKey: match.canonicalKey, productId: match.productId,
       matchMethod: match.method, matchScore: match.score,

@@ -31,6 +31,12 @@ Keys are deliberately short. Emit exactly these per tile:
     from that day until the leaflet ends, and dropping it back-dates the offer.
     If the tile says the offer runs on one day only — "Tylko w piątek, 14.08" —
     return "tylko 14.08". Keep the word, it is what marks a single-day price. Write nothing else — no "OFERTA", no "Oferta ważna", no year, no "do wyczerpania zapasów". Copy both dates exactly; never repeat the start date as the end date. Null if the tile shows no dates.
+- c: the aisle. Pick the narrowest that fits. Food for animals is "zwierzeta",
+  never "spozywcze" — it sits in the grocery aisle but is not something a person
+  eats. School and office supplies are "szkola-biuro", clothing "odziez", toys
+  "zabawki", cleaning and toiletries "chemia-higiena", furniture and garden
+  "dom-ogrod". Beer, wine and spirits are "alkohol", not "napoje". Ice cream and
+  frozen goods are "mrozonki", not "nabial".
 - b: the tile's bounding box as exactly four numbers [x, y, w, h], each a fraction of page width or height between 0 and 1.
 
 Page-level keys:

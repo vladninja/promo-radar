@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { classifyCategory } from '@/lib/normalize/category'
+import { classifyCategory, isPetFood } from '@/lib/normalize/category'
 
 describe('classifyCategory', () => {
   const cases: Array<[string, string]> = [
@@ -34,6 +34,15 @@ describe('classifyCategory', () => {
     expect(classifyCategory('długopisy Cristal Fun Colours, 8 szt.')).toBe('szkola-biuro')
     expect(classifyCategory('Karma dla psa Activ Pet, 2 kg')).toBe('zwierzeta')
     expect(classifyCategory('Bluza dresowa męska')).toBe('odziez')
+  })
+
+  it('recognises pet food by brand as well as by wording', () => {
+    // The model files these under groceries — they are sold in the food aisle —
+    // so the rule has to be confident enough to overrule it.
+    expect(isPetFood('Wszystkie karmy dla kotów marki PURINA ONE i FELIX')).toBe(true)
+    expect(isPetFood('Karma dla psa Activ Pet, 2 kg')).toBe(true)
+    expect(isPetFood('Masło Ekstra Mleczna Dolina, 200 g')).toBe(false)
+    expect(isPetFood('Karkówka grillowa')).toBe(false)
   })
 
   it('keeps pet food out of the meat aisle', () => {

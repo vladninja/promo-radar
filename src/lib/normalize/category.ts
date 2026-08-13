@@ -94,6 +94,22 @@ export function isFoodCategory(c: Category): boolean {
   return FOOD_CATEGORIES.includes(c)
 }
 
+/**
+ * Pet food, stated unambiguously.
+ *
+ * The model reads "Wszystkie karmy dla kotów marki PURINA ONE i FELIX" and
+ * reasonably files it under groceries — it is sold in the food aisle. For someone
+ * shopping for dinner it is not food, and unlike the fuzzy keyword rules this one
+ * is confident enough to overrule the model: "karma dla kotów" is never a human
+ * product, and the brands below sell nothing else.
+ */
+const PET_FOOD =
+  /\b(karm[ayę]|karmy|przysmak dla|żwirek|dla ps[aó]w?\b|dla kot[aów]+\b|purina|felix|whiskas|pedigree|kitekat|sheba|chappi|dolina noteci|activ pet|butcher's)\b/i
+
+export function isPetFood(name: string): boolean {
+  return PET_FOOD.test(name)
+}
+
 export function classifyCategory(name: string): Category {
   for (const [category, pattern] of RULES) {
     if (pattern.test(name)) return category
