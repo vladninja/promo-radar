@@ -49,11 +49,15 @@ Page-level keys:
 
 Do not invent tiles for decorative images or for the shop's own logo.
 
-A price bought with loyalty points or an activated coupon is not the price. A
-tile may show "0,01" beside "AKTYWUJ KUPON W APLIKACJI" and "-1000" points, or a
-similar token price, next to the ordinary promotional price. Report the price a
-shopper can pay at the till — "5,99" in that example — and ignore the points
-price entirely. Never report a token price like 0,01 as p.
+Some prices are not paid in money. A tile may carry a coin badge, "AKTYWUJ KUPON
+W APLIKACJI", "kupon w aplikacji", or a points cost written as "-1000". Set cpn
+true whenever such a marker appears, and put the number of points in pts when one
+is printed.
+
+Report in p the price a shopper can pay at the till. Where a tile shows both — a
+promotional 5,99 and a 0,01 available for 1000 points — p is 5,99, and cpn true
+with pts 1000 records the coupon. Never report the points price as p, whether it
+reads 0,01 or 5,99: the amount is not what makes it unavailable, the coupon is.
 
 A tile printing two prices for one product — a loyalty price beside a price
 without the card ("z kartą 1,49" and "bez karty 1,99", "cena bez karty Lidl

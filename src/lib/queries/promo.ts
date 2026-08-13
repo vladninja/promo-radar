@@ -25,6 +25,8 @@ export interface PromoDetail {
   promoKind: string
   minQty: number | null
   requiresLoyalty: boolean
+  requiresCoupon: boolean
+  couponPoints: number | null
   purchaseLimit: string | null
   validFrom: Date | null
   validTo: Date | null
@@ -71,6 +73,8 @@ const detailColumns = {
   promoKind: offers.promoKind,
   minQty: offers.minQty,
   requiresLoyalty: offers.requiresLoyalty,
+  requiresCoupon: offers.requiresCoupon,
+  couponPoints: offers.couponPoints,
   purchaseLimit: offers.purchaseLimit,
   validFrom: offers.validFrom,
   validTo: offers.validTo,

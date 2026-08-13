@@ -54,6 +54,9 @@ export function PromoView(props: {
   // Compare per unit when both sides state one, otherwise on the shelf price.
   // These are offers on the same product, so the sizes already agree — refusing
   // to compare for want of a unit price hides exactly what the page is for.
+  // A price behind a points coupon is not one every shopper can pay, so it does
+  // not get to win a comparison.
+  const comparable = !p.requiresCoupon
   const byUnit =
     p.unitPriceGrosze !== null &&
     props.elsewhere.some((o) => o.unitPriceGrosze !== null && o.unitBasis === p.unitBasis)
@@ -65,7 +68,7 @@ export function PromoView(props: {
   const cheapest = rivals[0]
   const cheapestElsewhere = cheapest?.o
   const beatsAll =
-    mine !== null && cheapest !== undefined
+    comparable && mine !== null && cheapest !== undefined
       ? mine <= (cheapest.value ?? Infinity)
       : null
   const rivalLabel = cheapest
@@ -99,6 +102,11 @@ export function PromoView(props: {
             <div>
               <span class="big">{formatZl(p.priceGrosze)}</span>
               {p.requiresLoyalty ? <span class="badge card-only">z kartą</span> : null}
+              {p.requiresCoupon ? (
+                <span class="badge card-only">
+                  kupon w aplikacji{p.couponPoints ? ` · ${p.couponPoints} pkt` : ''}
+                </span>
+              ) : null}
               {p.discountPercent !== null
                 ? <span class="badge best">-{p.discountPercent}%</span>
                 : null}

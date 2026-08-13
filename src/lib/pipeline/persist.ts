@@ -95,7 +95,11 @@ export async function persistPageResult(
     const reference =
       (tile.price_before ? parseGrosze(tile.price_before) : null) ??
       (tile.price_regular ? parseGrosze(tile.price_regular) : null)
-    const tokenPrice = looksLikeTokenPrice(price, reference)
+    // A price behind a points coupon is not one a shopper can simply pay. The
+    // marker is the reliable signal; the price floor is only a backstop for
+    // tiles where the model missed the badge.
+    const tokenPrice =
+      tile.requires_coupon || looksLikeTokenPrice(price, reference)
 
     await db.insert(offers).values({
       leafletId, pageNo,
@@ -109,6 +113,8 @@ export async function persistPageResult(
       unitPriceGrosze: unit?.grosze ?? null, unitBasis: unit?.basis ?? null,
       unitPriceRaw: tile.unit_price_raw,
       requiresLoyalty: tile.requires_loyalty,
+      requiresCoupon: tile.requires_coupon,
+      couponPoints: tile.coupon_points,
       purchaseLimit: tile.purchase_limit,
       // Pet food is the one place the rules overrule the model: it sits in the
       // food aisle, so the model files it as groceries, but nobody shopping for

@@ -84,6 +84,11 @@ export const offers = pgTable('offers', {
   unitBasis: unitBasis('unit_basis'),
   unitPriceRaw: text('unit_price_raw'),
   requiresLoyalty: boolean('requires_loyalty').notNull().default(false),
+  /** The price needs a coupon activated in the shop's app, often costing points.
+   *  Such a price is not available to a shopper who has none, so it must not be
+   *  compared against a shelf price. */
+  requiresCoupon: boolean('requires_coupon').notNull().default(false),
+  couponPoints: integer('coupon_points'),
   purchaseLimit: text('purchase_limit'),
   category: category('category').notNull().default('inne'),
   validFrom: timestamp('valid_from', { withTimezone: true }),

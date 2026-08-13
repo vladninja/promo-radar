@@ -58,6 +58,7 @@ function fakeVision(counter: { calls: number }): VisionClient {
             price_before: null, price_regular: null,
             discount_percent: 60, promo_kind: 'multibuy', min_qty: 3,
             unit_price_raw: '1,00 zł/100 g', requires_loyalty: true,
+            requires_coupon: false, coupon_points: null,
             purchase_limit: 'Limit dzienny 3 szt.',
             date_badge: 'OFERTA OD 13.08 DO 14.08',
             category: 'nabial' as const,

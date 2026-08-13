@@ -20,6 +20,10 @@ export const OfferTileSchema = z.object({
   min_qty: z.number().int().nullable(),
   unit_price_raw: z.string().nullable(),
   requires_loyalty: z.boolean(),
+  /** Marked with a coin badge, "aktywuj kupon", or a points cost. Defaulted so
+   *  readings taken before the field existed still parse. */
+  requires_coupon: z.boolean().default(false),
+  coupon_points: z.number().int().nullable().default(null),
   purchase_limit: z.string().nullable(),
   date_badge: z.string().nullable(),
   /** Aisle this promotion belongs to. Defaulted so readings made before
@@ -64,6 +68,8 @@ export const WireTileSchema = z.object({
   q: z.number().int().nullable(),      // minimum quantity
   u: z.string().nullable(),            // unit price, as printed
   l: z.boolean(),                      // loyalty card required
+  cpn: z.boolean(),                    // price needs a coupon activated in the app
+  pts: z.number().int().nullable(),    // points the coupon costs, e.g. 1000
   lim: z.string().nullable(),          // purchase limit
   dt: z.string().nullable(),           // dates only, e.g. "12.08-14.08"
   c: z.enum(CATEGORIES),               // aisle
@@ -96,6 +102,8 @@ export function toPageResult(w: WirePage): PageResult {
       min_qty: t.q,
       unit_price_raw: t.u,
       requires_loyalty: t.l,
+      requires_coupon: t.cpn,
+      coupon_points: t.pts,
       purchase_limit: t.lim,
       date_badge: t.dt,
       category: t.c,
