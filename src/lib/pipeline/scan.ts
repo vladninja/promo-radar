@@ -181,8 +181,9 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
         .select().from(leaflets).where(eq(leaflets.id, leafletId)).limit(1)
       // Prefer the source's own validity range over guessing a week from the
       // publication date, so offers with no printed dates still get real ones.
-      const leafletRange = leaflet!.validFrom && leaflet!.validTo
-        ? { from: leaflet!.validFrom, to: leaflet!.validTo }
+      const hasPublishedRange = leaflet!.validFrom !== null && leaflet!.validTo !== null
+      const leafletRange = hasPublishedRange
+        ? { from: leaflet!.validFrom!, to: leaflet!.validTo! }
         : fallbackLeafletRange(leaflet!.publishedAt)
       const pageDir = join(storageDir, 'pages', leafletId)
       await mkdir(pageDir, { recursive: true })
@@ -238,6 +239,7 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
           result: outcome.result,
           publishedAt: leaflet!.publishedAt,
           leafletRange,
+          leafletRangeIsGuess: !hasPublishedRange,
           tokensIn: outcome.tokensIn, tokensOut: outcome.tokensOut,
           splitRetry: outcome.splitRetry,
         })
@@ -262,12 +264,11 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       // The publisher's own range wins when we have it. Deriving from page
       // headers would narrow a 12.08-19.08 leaflet to whichever 3-day
       // sub-period happened to be printed on the pages parsed so far.
-      const fromSource = leaflet!.validFrom !== null && leaflet!.validTo !== null
       await db.update(leaflets).set({
-        validFrom: fromSource
+        validFrom: hasPublishedRange
           ? leaflet!.validFrom
           : agg!.from ? new Date(agg!.from) : leafletRange.from,
-        validTo: fromSource
+        validTo: hasPublishedRange
           ? leaflet!.validTo
           : agg!.to ? new Date(agg!.to) : leafletRange.to,
         status: !complete ? 'partial' : Number(agg!.failed) > 0 ? 'partial' : 'done',

@@ -32,8 +32,9 @@ try {
     .where(eq(leaflets.id, leafletId)).limit(1)
   if (!leaflet) throw new Error(`no leaflet ${leafletId}`)
 
-  const leafletRange = leaflet.validFrom && leaflet.validTo
-    ? { from: leaflet.validFrom, to: leaflet.validTo }
+  const hasPublishedRange = leaflet.validFrom !== null && leaflet.validTo !== null
+  const leafletRange = hasPublishedRange
+    ? { from: leaflet.validFrom!, to: leaflet.validTo! }
     : fallbackLeafletRange(leaflet.publishedAt)
 
   const raw = JSON.parse(await readFile(jsonPath, 'utf8')) as Array<{
@@ -64,6 +65,7 @@ try {
       result,
       publishedAt: leaflet.publishedAt,
       leafletRange,
+      leafletRangeIsGuess: !hasPublishedRange,
     })
     pages++
     offers += out.offersCreated

@@ -17,6 +17,12 @@ export interface PersistArgs {
   result: PageResult
   publishedAt: Date
   leafletRange: DateRange
+  /**
+   * True when leafletRange was invented from the publication date rather than
+   * taken from the shop's own listing. Falling back to a real published range is
+   * fine; falling back to a guess is what deserves review.
+   */
+  leafletRangeIsGuess?: boolean
   tokensIn?: number
   tokensOut?: number
   splitRetry?: boolean
@@ -79,7 +85,9 @@ export async function persistPageResult(
       validFrom: range.from, validTo: range.to, dateSource: dateSrc,
       canonicalKey: match.canonicalKey, productId: match.productId,
       matchMethod: match.method, matchScore: match.score,
-      needsReview: match.needsReview || dateSrc === 'leaflet',
+      needsReview:
+        match.needsReview ||
+        (dateSrc === 'leaflet' && args.leafletRangeIsGuess === true),
       bbox: tile.bbox,
     })
     offersCreated++
