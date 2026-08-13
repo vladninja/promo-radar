@@ -3,8 +3,9 @@
 Collects Polish grocery leaflets, extracts offers with OpenAI vision, and links
 the same product across shops.
 
-Shops: Biedronka, Lidl, Kaufland. Source: the `gazetkipromocyjne.net` WordPress
-REST media endpoint, which publishes each chain's leaflet as a PDF.
+Shops: Biedronka, Lidl, Kaufland. Source: the `gazetkipromocyjne.net` shop
+listing pages, which publish each chain's leaflet as a PDF alongside its
+validity dates.
 
 ## Setup
 
@@ -41,7 +42,7 @@ money parsing, size extraction, product matching — via `persistPageResult`.
 
 ```bash
 pnpm tsx scripts/prepare-leaflet.ts --list        # what is on offer today
-pnpm tsx scripts/prepare-leaflet.ts 113128        # download + render, no API cost
+pnpm tsx scripts/prepare-leaflet.ts 4__6a7c1f3ae960d   # download + render, free
 # look at storage/pages/<leafletId>/p*.jpg, write readings as JSON
 pnpm tsx scripts/ingest-pages.ts <leafletId> readings.json
 ```
