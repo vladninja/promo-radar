@@ -27,6 +27,7 @@ docker-compose exec -T db psql -U promo -d promo_radar -c \
 | Command | What it does |
 |---|---|
 | `pnpm scan` | Discover, download, extract and match. Run daily. |
+| `MAX_PAGES_PER_RUN=0 pnpm scan` | Free dry run: reports what would be parsed without spending anything. |
 | `pnpm reparse <externalId>` | Clear one leaflet so the next scan re-extracts it. |
 | `pnpm rescore` | Re-run matching over all offers. No API calls. |
 | `pnpm prune` | Delete rendered page images older than 30 days. |
@@ -36,14 +37,22 @@ docker-compose exec -T db psql -U promo -d promo_radar -c \
 
 1. **Discover** — `GET /wp-json/wp/v2/media?mime_type=application/pdf&after=<cursor>`.
    The shop comes from the attachment `link` (`…/biedronka/attachment/…`); the
-   filename prefix is unreliable.
-2. **Acquire** — download at 1 req/s, content-hash, store under `storage/pdf/`.
-3. **Rasterize** — `pdftoppm -r 110 -jpeg` per page.
-4. **Extract** — one vision call per page returning schema-validated offer tiles.
+   filename prefix is unreliable. One listing page per shop then supplies each
+   leaflet's validity dates and often its page count, paired to the PDF in the
+   same markup.
+2. **Keep only what is on offer today** — `valid_from <= today <= valid_to`.
+   Expired leaflets are dropped, and so are ones not yet started: shops publish
+   next week's leaflet days early, and it is parsed on the day it begins. The
+   cursor is held just behind any skipped future leaflet so it stays
+   discoverable. Nothing already parsed is parsed again (`file_hash`, per-page
+   status, and page-image hashes).
+3. **Acquire** — download at 1 req/s, content-hash, store under `storage/pdf/`.
+4. **Rasterize** — `pdftoppm -r 110 -jpeg` per page.
+5. **Extract** — one vision call per page returning schema-validated offer tiles.
    The leaflet PDFs carry **no text layer**, so every page goes to vision.
-5. **Resolve dates** — the leaflet states its own precedence: dates printed on an
+6. **Resolve dates** — the leaflet states its own precedence: dates printed on an
    offer beat dates printed on the page. The year comes from `NR nn/YYYY`.
-6. **Match** — canonical key, then `pg_trgm` similarity within the same unit and
+7. **Match** — canonical key, then `pg_trgm` similarity within the same unit and
    ±5% size.
 
 ## Web UI
@@ -83,9 +92,9 @@ savings target the JSON coming back:
 | Measure | Effect |
 |---|---|
 | Terse wire schema — short keys, positional bbox, dates only | −17% output tokens, −12% total (measured on identical pages) |
-| Skip leaflets already expired, using dates from the shop listing page | Avoids whole leaflets: 40–95 pages, $0.08–0.20 each |
+| Parse only leaflets on offer today, using dates from the shop listing page | Avoids whole leaflets: 40–95 pages, $0.08–0.20 each |
 | Reuse pages by image hash | A republished page is never billed twice |
-| Only leaflets that can still be current | `MAX_LEAFLET_AGE_DAYS` (default 14), used when the listing page gives no dates |
+| Publication-age fallback | `MAX_LEAFLET_AGE_DAYS` (default 14), used only when the listing page gives no dates |
 
 The model emits short keys (`n`, `p`, `pb`, `dt`, `b`…) which
 `toPageResult()` maps back to the readable shape everything else uses, so the

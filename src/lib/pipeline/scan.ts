@@ -30,6 +30,7 @@ export interface ScanDeps {
 export interface ScanStats {
   leafletsSeen: number
   leafletsSkippedOld: number
+  leafletsSkippedFuture: number
   leafletsSkippedExpired: number
   leafletsNew: number
   leafletsResumed: number
@@ -62,7 +63,8 @@ export async function isStale(
 export async function runScan(deps: ScanDeps): Promise<ScanStats> {
   const { db, source, client, storageDir, now } = deps
   const stats: ScanStats = {
-    leafletsSeen: 0, leafletsSkippedOld: 0, leafletsSkippedExpired: 0,
+    leafletsSeen: 0, leafletsSkippedOld: 0, leafletsSkippedFuture: 0,
+    leafletsSkippedExpired: 0,
     leafletsNew: 0, leafletsResumed: 0,
     pagesExtracted: 0, pagesReused: 0, pagesFailed: 0,
     offersCreated: 0, tokensIn: 0, tokensOut: 0, costUsd: 0, capped: false,
@@ -86,17 +88,25 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
     const ageCutoff = new Date(
       now().getTime() - deps.maxLeafletAgeDays * 24 * 3600 * 1000,
     )
+    // Parse only what is on offer today. Dates from the shop listing page make
+    // this exact; without them, publication age is the fallback.
+    const isCurrent = (d: typeof all[number]) => {
+      if (d.validFrom && d.validTo) return d.validFrom <= now() && d.validTo >= now()
+      if (d.validTo) return d.validTo >= now()
+      return d.publishedAt >= ageCutoff
+    }
+    // Already published but not started yet. Shops post next week's leaflet
+    // days ahead; it is parsed on the day it becomes current, not before.
+    const isFuture = (d: typeof all[number]) => d.validFrom !== null && d.validFrom > now()
+
     const discovered = all
-      .filter((d) => {
-        // Real validity dates from the shop listing page win: a leaflet whose
-        // promotions have ended is skipped before a single page is downloaded.
-        if (d.validTo) return d.validTo >= now()
-        return d.publishedAt >= ageCutoff
-      })
+      .filter(isCurrent)
       .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
+    const future = all.filter(isFuture)
 
     stats.leafletsSeen = discovered.length
-    stats.leafletsSkippedOld = all.length - discovered.length
+    stats.leafletsSkippedFuture = future.length
+    stats.leafletsSkippedOld = all.length - discovered.length - future.length
 
     const shopRows = await db.select().from(shops)
     const shopIdBySlug = new Map(shopRows.map((s) => [s.slug, s.id]))
@@ -320,6 +330,15 @@ export async function runScan(deps: ScanDeps): Promise<ScanStats> {
       }).where(eq(leaflets.id, leafletId))
 
       if (stats.capped) break
+    }
+
+    // A not-yet-current leaflet must stay discoverable until the day it starts,
+    // so the cursor is held just behind the earliest one we skipped.
+    if (newestSeen && future.length > 0) {
+      const earliestFuture = new Date(
+        Math.min(...future.map((f) => f.publishedAt.getTime())) - 1,
+      )
+      if (earliestFuture < newestSeen) newestSeen = earliestFuture
     }
 
     // A capped run leaves discovered-but-untouched leaflets behind. Advancing

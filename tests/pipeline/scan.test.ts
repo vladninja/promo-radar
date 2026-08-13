@@ -242,6 +242,56 @@ describe('runScan', () => {
     expect(rows[0]!.validTo!.toISOString().slice(0, 10)).toBe('2026-08-19')
   })
 
+  it('does not parse a leaflet whose promotions have not started yet', async () => {
+    const c = { calls: 0 }
+    let downloads = 0
+    const NOW = new Date('2026-08-12T12:00:00Z')
+    const dated: LeafletSource = {
+      ...fakeSource,
+      async discover() {
+        return [
+          {
+            shopSlug: 'biedronka', externalId: 'NEXTWEEK',
+            pdfUrl: 'https://example.test/a.pdf',
+            publishedAt: new Date('2026-08-11T00:00:00Z'),
+            coverUrl: null,
+            validFrom: new Date('2026-08-17T00:00:00Z'),   // starts in 5 days
+            validTo: new Date('2026-08-22T23:59:59Z'),
+            pageCount: 62,
+          },
+          {
+            shopSlug: 'biedronka', externalId: 'TODAY',
+            pdfUrl: 'https://example.test/b.pdf',
+            publishedAt: new Date('2026-08-10T00:00:00Z'),
+            coverUrl: null,
+            validFrom: new Date('2026-08-12T00:00:00Z'),
+            validTo: new Date('2026-08-14T23:59:59Z'),
+            pageCount: 2,
+          },
+        ]
+      },
+      async fetchAsset(l, destDir) {
+        downloads++
+        await mkdir(join(destDir, 'biedronka'), { recursive: true })
+        const path = join(destDir, 'biedronka', `${l.externalId}.pdf`)
+        await copyFile('tests/fixtures/leaflet-2pages.pdf', path)
+        return { path, sha256: `h-${l.externalId}` }
+      },
+    }
+
+    const stats = await runScan({ ...deps(c), source: dated })
+    expect(stats.leafletsSkippedFuture).toBe(1)
+    expect(downloads).toBe(1)
+    const rows = await db.select().from(leaflets)
+    expect(rows.map((r) => r.externalId)).toEqual(['TODAY'])
+
+    // The cursor must stay behind the future leaflet, or it would never be
+    // discovered again once it becomes current.
+    const { rows: cur } = await pool.query('select last_seen_date from source_cursors')
+    expect(new Date(cur[0].last_seen_date) < new Date('2026-08-11T00:00:00Z')).toBe(true)
+    expect(NOW > new Date('2026-08-11T00:00:00Z')).toBe(true)   // sanity
+  })
+
   it('reuses an identical page instead of paying for it twice', async () => {
     const c = { calls: 0 }
     // Two leaflets built from the same PDF, so their page images are identical.
