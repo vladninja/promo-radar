@@ -33,6 +33,27 @@ docker-compose exec -T db psql -U promo -d promo_radar -c \
 | `pnpm prune` | Delete rendered page images older than 30 days. |
 | `pnpm test` | Full test suite. Needs `pnpm db:up` first. |
 
+## Reading a leaflet by hand
+
+The vision API is not the only way in. Any source of page readings can be
+ingested, and it goes through identical downstream logic — date precedence,
+money parsing, size extraction, product matching — via `persistPageResult`.
+
+```bash
+pnpm tsx scripts/prepare-leaflet.ts --list        # what is on offer today
+pnpm tsx scripts/prepare-leaflet.ts 113128        # download + render, no API cost
+# look at storage/pages/<leafletId>/p*.jpg, write readings as JSON
+pnpm tsx scripts/ingest-pages.ts <leafletId> readings.json
+```
+
+The JSON is `[{ "pageNo": 1, "result": { page_date_badge, issue_text, tiles: [...] } }]`,
+validated against the same schema the API output must satisfy, so a malformed
+reading fails loudly instead of corrupting the data. Pages already marked done
+are skipped, so ingestion is repeatable.
+
+This is useful for spot-fixing a page the model got wrong, and it means the
+pipeline is not locked to one vision provider.
+
 ## How it works
 
 1. **Discover** — `GET /wp-json/wp/v2/media?mime_type=application/pdf&after=<cursor>`.
