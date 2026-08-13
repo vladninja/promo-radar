@@ -1,6 +1,7 @@
 import { Layout } from '@/server/views/layout'
 import { formatPromo, formatRange, formatUnitPrice, formatZl } from '@/lib/format'
 import type { PromoFilters, PromoRow } from '@/lib/queries/promos'
+import { CATEGORIES, CATEGORY_LABELS } from '@/lib/normalize/category'
 
 const SHOPS = [
   ['', 'Wszystkie sklepy'],
@@ -18,6 +19,14 @@ export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
         <select name="shop">
           {SHOPS.map(([value, label]) => (
             <option value={value} selected={(filters.shop ?? '') === value}>{label}</option>
+          ))}
+        </select>
+        <select name="category">
+          <option value="">Wszystkie kategorie</option>
+          {CATEGORIES.map((c) => (
+            <option value={c} selected={filters.category === c}>
+              {CATEGORY_LABELS[c]}
+            </option>
           ))}
         </select>
         <select name="sort">
@@ -39,8 +48,8 @@ export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
       <table>
         <thead>
           <tr>
-            <th>Produkt</th><th>Sklep</th><th>Cena</th><th>Za jednostkę</th>
-            <th>Promocja</th><th>Termin</th><th>Sklepy</th>
+            <th>Promocja</th><th>Kategoria</th><th>Sklep</th><th>Cena</th><th>Za jednostkę</th>
+            <th>Rodzaj</th><th>Termin</th><th>Sklepy</th>
           </tr>
         </thead>
         <tbody>
@@ -52,6 +61,7 @@ export function PromosView(props: { rows: PromoRow[]; filters: PromoFilters }) {
                   : r.rawName}
                 {r.needsReview ? <> <span class="badge review">do sprawdzenia</span></> : null}
               </td>
+              <td><span class="badge cat">{CATEGORY_LABELS[r.category]}</span></td>
               <td>{r.shopSlug}</td>
               <td class="price">
                 {formatZl(r.priceGrosze)}

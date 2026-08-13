@@ -15,6 +15,7 @@ const tile = (over: Partial<PageResult['tiles'][number]> = {}) => ({
   requires_loyalty: true,
   purchase_limit: 'Limit dzienny 3 szt. na kartę Moja Biedronka',
   date_badge: 'OFERTA OD 13.08 DO 14.08',
+  category: 'nabial' as const,
   bbox: { x: 0.55, y: 0.03, w: 0.4, h: 0.2 },
   ...over,
 })

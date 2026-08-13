@@ -1,0 +1,3 @@
+CREATE TYPE "public"."category" AS ENUM('owoce-warzywa', 'mieso-wedliny', 'ryby', 'nabial', 'pieczywo', 'napoje', 'alkohol', 'slodycze-przekaski', 'mrozonki', 'spozywcze', 'chemia-higiena', 'dom-ogrod', 'inne');--> statement-breakpoint
+ALTER TABLE "offers" ADD COLUMN "category" "category" DEFAULT 'inne' NOT NULL;--> statement-breakpoint
+CREATE INDEX "offers_category_idx" ON "offers" USING btree ("category");

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { CATEGORIES } from '@/lib/normalize/category'
 
 export const OfferTileSchema = z.object({
   raw_name: z.string(),
@@ -21,6 +22,9 @@ export const OfferTileSchema = z.object({
   requires_loyalty: z.boolean(),
   purchase_limit: z.string().nullable(),
   date_badge: z.string().nullable(),
+  /** Aisle this promotion belongs to. Defaulted so readings made before
+   *  categories existed still parse; a keyword classifier fills the gap. */
+  category: z.enum(CATEGORIES).nullable().default(null),
   bbox: z.object({
     x: z.number(), y: z.number(), w: z.number(), h: z.number(),
   }),
@@ -55,6 +59,7 @@ export const WireTileSchema = z.object({
   l: z.boolean(),                      // loyalty card required
   lim: z.string().nullable(),          // purchase limit
   dt: z.string().nullable(),           // dates only, e.g. "12.08-14.08"
+  c: z.enum(CATEGORIES),               // aisle
   b: z.array(z.number()).length(4),    // bbox: x, y, w, h
 })
 
@@ -84,6 +89,7 @@ export function toPageResult(w: WirePage): PageResult {
       requires_loyalty: t.l,
       purchase_limit: t.lim,
       date_badge: t.dt,
+      category: t.c,
       bbox: { x: t.b[0]!, y: t.b[1]!, w: t.b[2]!, h: t.b[3]! },
     })),
   }

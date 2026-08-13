@@ -19,6 +19,7 @@ th { font-weight:600; color:var(--muted); font-size:13px; }
 .badge.card { background:#fff3cd; }
 .badge.review { background:#ffe0e0; }
 .badge.best { background:#d7f5dd; }
+.badge.cat { background:#e8eefc; color:#31456b; white-space:nowrap; }
 form.filters { display:flex; gap:.75rem; flex-wrap:wrap; align-items:center;
   margin-bottom:1.25rem; }
 input,select,button { padding:.35rem .5rem; font:inherit; }

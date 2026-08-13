@@ -7,6 +7,7 @@ import { leafletPages } from '@/lib/db/schema'
 import { getLeafletPage } from '@/lib/queries/leaflet'
 import { getProduct } from '@/lib/queries/product'
 import { listPromos, type PromoFilters } from '@/lib/queries/promos'
+import { CATEGORIES, type Category } from '@/lib/normalize/category'
 import { LeafletView } from '@/server/views/leaflet'
 import { ProductView } from '@/server/views/product'
 import { PromosView } from '@/server/views/promos'
@@ -20,6 +21,9 @@ function promoFilters(c: Context): PromoFilters {
     shop: q.shop || undefined,
     crossShopOnly: q.cross === '1',
     needsReview: q.review === '1',
+    category: (CATEGORIES as readonly string[]).includes(q.category ?? '')
+      ? (q.category as Category)
+      : undefined,
     sort: q.sort === 'unit' ? 'unit' : 'discount',
   }
 }

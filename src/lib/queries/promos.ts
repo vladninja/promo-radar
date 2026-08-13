@@ -1,12 +1,14 @@
 import { and, eq, gte, lte, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { leaflets, offers, shops } from '@/lib/db/schema'
+import type { Category } from '@/lib/normalize/category'
 
 export interface PromoFilters {
   q?: string
   shop?: string
   crossShopOnly?: boolean
   needsReview?: boolean
+  category?: Category
   sort?: 'discount' | 'unit'
   now?: Date
 }
@@ -24,6 +26,7 @@ export interface PromoRow {
   discountPercent: number | null
   requiresLoyalty: boolean
   needsReview: boolean
+  category: Category
   validFrom: Date | null
   validTo: Date | null
   shopCount: number
@@ -45,6 +48,7 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
   if (f.shop) where.push(eq(shops.slug, f.shop))
   if (f.q) where.push(sql`${offers.rawName} ilike ${'%' + f.q + '%'}`)
   if (f.needsReview) where.push(eq(offers.needsReview, true))
+  if (f.category) where.push(eq(offers.category, f.category))
   if (f.crossShopOnly) where.push(sql`${shopCount} > 1`)
 
   const order = f.sort === 'unit'
@@ -65,6 +69,7 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
       discountPercent: offers.discountPercent,
       requiresLoyalty: offers.requiresLoyalty,
       needsReview: offers.needsReview,
+      category: offers.category,
       validFrom: offers.validFrom,
       validTo: offers.validTo,
       shopCount: shopCount.as('shop_count'),

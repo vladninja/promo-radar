@@ -2,6 +2,7 @@ import { eq, isNull, or } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { leaflets, offers, products } from '@/lib/db/schema'
 import { attachToProduct } from '@/lib/match/attach'
+import { classifyCategory } from '@/lib/normalize/category'
 import { extractSize } from '@/lib/normalize/size'
 
 /**
@@ -31,6 +32,9 @@ export async function rescoreAll(db: Db): Promise<{ offers: number; relinked: nu
       brand: row.brand, name: row.rawName, size: extractSize(row.rawName),
     })
     await db.update(offers).set({
+      // Re-classify too: extending the keyword rules should reach every offer
+      // already stored, not only the ones read afterwards.
+      category: classifyCategory(row.rawName),
       canonicalKey: match.canonicalKey, productId: match.productId,
       matchMethod: match.method, matchScore: match.score,
       needsReview:

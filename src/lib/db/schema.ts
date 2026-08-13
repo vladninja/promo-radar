@@ -10,6 +10,11 @@ export const dateSource = pgEnum('date_source', ['offer', 'page', 'leaflet'])
 export const sizeUnit = pgEnum('size_unit', ['g', 'ml', 'pcs'])
 export const unitBasis = pgEnum('unit_basis', ['kg', 'l', 'pcs'])
 export const matchMethod = pgEnum('match_method', ['exact', 'trigram', 'new'])
+export const category = pgEnum('category', [
+  'owoce-warzywa', 'mieso-wedliny', 'ryby', 'nabial', 'pieczywo', 'napoje',
+  'alkohol', 'slodycze-przekaski', 'mrozonki', 'spozywcze', 'chemia-higiena',
+  'dom-ogrod', 'inne',
+])
 
 export const shops = pgTable('shops', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -80,6 +85,7 @@ export const offers = pgTable('offers', {
   unitPriceRaw: text('unit_price_raw'),
   requiresLoyalty: boolean('requires_loyalty').notNull().default(false),
   purchaseLimit: text('purchase_limit'),
+  category: category('category').notNull().default('inne'),
   validFrom: timestamp('valid_from', { withTimezone: true }),
   validTo: timestamp('valid_to', { withTimezone: true }),
   dateSource: dateSource('date_source').notNull(),
@@ -92,6 +98,7 @@ export const offers = pgTable('offers', {
 }, (t) => [
   index('offers_product_idx').on(t.productId),
   index('offers_valid_idx').on(t.validFrom, t.validTo),
+  index('offers_category_idx').on(t.category),
 ])
 
 export const jobRuns = pgTable('job_runs', {
