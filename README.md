@@ -119,9 +119,8 @@ the size extraction, and mixing it with printed ones in the "cheapest" logic
 would hide which is which. If it is added, it belongs in its own column.
 
 Prices marked **z kartą** require the shop's loyalty card, so they are not
-comparable to a plain shelf price. "Najtaniej" is decided on the normalized unit
-price and only among offers sharing the same basis (per kg, per l, or per piece),
-so a per-piece price never wins against a per-kilogram one.
+comparable to a plain shelf price. "Najtaniej" follows the comparison rule above, and
+never lets a per-piece price win against a per-kilogram one.
 
 The cross-shop view only has something to show once two different shops promote
 the same product, which needs a few days of scans across Biedronka, Lidl and

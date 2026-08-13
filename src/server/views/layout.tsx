@@ -272,7 +272,6 @@ export function Layout(props: { title: string; children: unknown }) {
           <nav>
             <a href="/">Promocje</a>
             <a href="/?cross=1">W kilku sklepach</a>
-            <a href="/?sort=unit">Najtaniej za jednostkę</a>
           </nav>
         </header>
         <main>{props.children}</main>
