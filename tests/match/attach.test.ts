@@ -119,6 +119,54 @@ describe('attachToProduct', () => {
     expect(second.productId).toBe(first.productId)
   })
 
+  it('never groups a whole category across shops', async () => {
+    // Two shops discounting their kabanosy ranges, on different terms, over
+    // different items. Not one product.
+    const biedronka = await attachToProduct(db, {
+      brand: null, name: 'Wszystkie paczkowane kabanosy', size: null,
+    })
+    const lidl = await attachToProduct(db, {
+      brand: 'Pikok', name: 'Wszystkie kabanosy Pikok', size: null,
+    })
+    expect(lidl.productId).not.toBe(biedronka.productId)
+  })
+
+  it('still collapses the same category promo printed twice in one leaflet', async () => {
+    const first = await attachToProduct(db, {
+      brand: null, name: 'Wszystkie paczkowane kabanosy', size: null,
+    })
+    const again = await attachToProduct(db, {
+      brand: null, name: 'Wszystkie paczkowane kabanosy', size: null,
+    })
+    expect(again.method).toBe('exact')
+    expect(again.productId).toBe(first.productId)
+  })
+
+  it('never groups a private label with a similarly named product', async () => {
+    // K-Classic is Kaufland's own; no other chain can stock it.
+    const kaufland = await attachToProduct(db, {
+      brand: 'K-CLASSIC', name: 'K-CLASSIC Paluszki rybne z mintaja, 900 g',
+      size: { value: 900, unit: 'g' },
+    })
+    const other = await attachToProduct(db, {
+      brand: null, name: 'Paluszki rybne z mintaja, 900 g',
+      size: { value: 900, unit: 'g' },
+    })
+    expect(other.productId).not.toBe(kaufland.productId)
+  })
+
+  it('still groups a national brand across shops', async () => {
+    const a = await attachToProduct(db, {
+      brand: 'Pudliszki', name: 'Ketchup łagodny Pudliszki, 990 g',
+      size: { value: 990, unit: 'g' },
+    })
+    const b = await attachToProduct(db, {
+      brand: 'Pudliszki', name: 'Ketchup Pudliszki łagodny 990 g',
+      size: { value: 990, unit: 'g' },
+    })
+    expect(b.productId).toBe(a.productId)
+  })
+
   it('matches loose goods on name alone', async () => {
     const first = await attachToProduct(db, {
       brand: null, name: 'Winogrono jasne na wagę', size: null,

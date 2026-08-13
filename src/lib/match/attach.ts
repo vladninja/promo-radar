@@ -1,6 +1,7 @@
 import { and, eq, isNull, or, sql, type SQLWrapper } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { products } from '@/lib/db/schema'
+import { PRIVATE_LABELS, isCategoryPromo } from '@/lib/normalize/brands'
 import { canonicalKey, coreName } from '@/lib/normalize/canonical'
 import type { Size } from '@/lib/normalize/size'
 
@@ -38,6 +39,14 @@ export async function attachToProduct(
 ): Promise<MatchResult> {
   const key = canonicalKey(input)
   const core = coreName(input.name)
+  const brandKey = normalizeBrand(input.brand)
+
+  // Similarity is only meaningful for things that could be the same product in
+  // two shops. A whole category on promotion is not a product, and a private
+  // label exists in one chain only, so both are matched by exact key alone —
+  // which still collapses the same offer printed twice in one leaflet.
+  const groupable =
+    !isCategoryPromo(core) && !(brandKey !== null && PRIVATE_LABELS.has(brandKey))
 
   const [exact] = await db
     .select({ id: products.id })
@@ -52,7 +61,6 @@ export async function attachToProduct(
   // similar the words around them read. "Mleko Łaciate 3,2%" and "Mleko Mlekovita
   // 3,2%" differ by one token and would otherwise merge, which for a price
   // comparison is worse than not matching at all.
-  const brandKey = normalizeBrand(input.brand)
   const brandFilter = brandKey
     ? or(isNull(products.brand), sql`${brandNorm(products.brand)} = ${brandKey}`)
     : sql`true`
@@ -65,15 +73,26 @@ export async function attachToProduct(
       )
     : sql`${products.sizeValue} is null`
 
-  const [candidate] = await db
+  const candidates = !groupable ? [] : await db
     .select({
       id: products.id,
+      brand: products.brand,
+      displayName: products.displayName,
       score: sql<number>`similarity(${products.displayName}, ${core})`.as('score'),
     })
     .from(products)
     .where(and(sizeFilter, brandFilter))
     .orderBy(sql`similarity(${products.displayName}, ${core}) desc`)
-    .limit(1)
+    .limit(5)
+
+  // The rule has to hold in both directions: an unbranded "Paluszki rybne" must
+  // not attach itself to Kaufland's "K-CLASSIC Paluszki rybne" either, so
+  // ungroupable products are rejected as candidates as well as as searchers.
+  const candidate = candidates.find((c) => {
+    const cBrand = normalizeBrand(c.brand)
+    if (cBrand !== null && PRIVATE_LABELS.has(cBrand)) return false
+    return !isCategoryPromo(c.displayName)
+  })
 
   if (candidate && candidate.score >= THRESHOLD_ATTACH) {
     return {
