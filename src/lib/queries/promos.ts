@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, lte, sql, type SQL } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { leaflets, offers, shops } from '@/lib/db/schema'
 import { FOOD_CATEGORIES, type Category } from '@/lib/normalize/category'
+import { effectiveDiscount } from '@/lib/queries/sort'
 
 export interface PromoFilters {
   q?: string
@@ -52,16 +53,6 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
   if (f.category) where.push(eq(offers.category, f.category))
   if (f.foodOnly) where.push(inArray(offers.category, [...FOOD_CATEGORIES]))
   if (f.crossShopOnly) where.push(sql`${shopCount} > 1`)
-
-  // "Trzeci produkt 100% taniej" is not a 100% discount, it is a third off three
-  // items — but it is printed as 100, so sorting on the printed number put
-  // thirteen price-less bundles at the head of the list and every real bargain
-  // behind them. Spread a multibuy's headline over the bundle it applies to.
-  const effectiveDiscount = sql`case
-    when ${offers.promoKind} = 'multibuy' and coalesce(${offers.minQty}, 0) > 1
-      then ${offers.discountPercent}::numeric / ${offers.minQty}
-    else ${offers.discountPercent}::numeric
-  end`
 
   const order = f.sort === 'unit'
     ? sql`${offers.unitPriceGrosze} asc nulls last`

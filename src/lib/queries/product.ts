@@ -72,21 +72,33 @@ export async function getProduct(
     ))
 
   // A leaflet prints its headline offers on the cover and again in the section,
-  // often with fuller detail the second time. That is one offer, not two, so the
-  // rows are merged: same shop, same price, same promotion, same dates.
+  // often with fuller detail the second time, and quotes a loyalty price beside
+  // one without the card. All of that is one offer: same shop, same leaflet, same
+  // product, same mechanic, same dates. Price and loyalty are deliberately out of
+  // the key — with them in, Lidl's watermelon was listed twice, at 1,49 z kartą
+  // and at 1,99, on a page whose whole job is to compare shops.
   const merged = new Map<string, typeof rows[number] & { pageNos: number[] }>()
   for (const r of rows) {
     const key = [
-      r.shopSlug, r.priceGrosze ?? 'x', r.promoKind, r.minQty ?? 'x',
-      r.requiresLoyalty, r.validFrom?.getTime() ?? 'x', r.validTo?.getTime() ?? 'x',
+      r.shopSlug, r.leafletId, r.rawName, r.promoKind, r.minQty ?? 'x',
+      r.validFrom?.getTime() ?? 'x', r.validTo?.getTime() ?? 'x',
     ].join('|')
     const seen = merged.get(key)
     if (!seen) {
       merged.set(key, { ...r, pageNos: [r.pageNo] })
       continue
     }
-    seen.pageNos.push(r.pageNo)
-    seen.pageNos.sort((a, b) => a - b)
+    const pageNos = [...new Set([...seen.pageNos, r.pageNo])].sort((a, b) => a - b)
+    // The loyalty price is the headline and the price without the card is the
+    // comparison, exactly as on the promotion page.
+    if (r.requiresLoyalty && !seen.requiresLoyalty) {
+      const plain = seen.priceGrosze
+      Object.assign(seen, r)
+      seen.priceRegular ??= plain
+    } else if (!r.requiresLoyalty && seen.requiresLoyalty) {
+      seen.priceRegular ??= r.priceGrosze
+    }
+    seen.pageNos = pageNos
     // Keep whichever printing told us more.
     seen.priceBefore ??= r.priceBefore
     seen.priceRegular ??= r.priceRegular
@@ -94,7 +106,7 @@ export async function getProduct(
     seen.unitPriceGrosze ??= r.unitPriceGrosze
     seen.unitBasis ??= r.unitBasis
     seen.purchaseLimit ??= r.purchaseLimit
-    seen.pageNo = seen.pageNos[0]!
+    seen.pageNo = pageNos[0]!
   }
   const deduped = [...merged.values()]
 

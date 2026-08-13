@@ -2,6 +2,7 @@ import { and, eq, gte, lte, ne, sql } from 'drizzle-orm'
 import type { Db } from '@/lib/db/client'
 import { leaflets, offers, shops } from '@/lib/db/schema'
 import type { Category } from '@/lib/normalize/category'
+import { effectiveDiscount } from '@/lib/queries/sort'
 
 export interface PromoDetail {
   offerId: string
@@ -175,22 +176,30 @@ export async function getSameProductElsewhere(
       lte(offers.validFrom, now),
       gte(offers.validTo, now),
     ))
-    .orderBy(sql`${offers.unitPriceGrosze} asc nulls last`)
-    .limit(12)
+    .orderBy(sql`${offers.unitPriceGrosze} asc nulls last, ${offers.priceGrosze} asc nulls last`)
+    .limit(24)
 
-  // One entry per shop: another leaflet may print the same offer twice as well.
+  // One entry per shop. Another leaflet prints the same offer twice as well, and
+  // keying on the price let a shop appear twice whenever its two printings
+  // disagreed — which is exactly when the second one is worth least.
   const seen = new Set<string>()
   return rows
     .filter((r) => {
-      const key = `${r.shopSlug}|${r.priceGrosze}|${r.requiresLoyalty}`
-      if (seen.has(key)) return false
-      seen.add(key)
+      if (seen.has(r.shopSlug)) return false
+      seen.add(r.shopSlug)
       return true
     })
     .map((r) => ({ ...r, hasImage: isBox(r.bbox) }))
 }
 
-/** Other promotions from the same aisle, for browsing sideways. */
+/**
+ * Other promotions from the same aisle, for browsing sideways.
+ *
+ * "Other" has to mean other product, not other row. Excluding the offer being
+ * viewed left its own siblings in the strip — one watermelon, printed on pages
+ * 1, 20 and 49 of the same Lidl leaflet, filled three of the twelve slots
+ * underneath itself. The strip carries one card per product, like the listing.
+ */
 export async function getSimilarPromos(
   db: Db,
   promo: PromoDetail,
@@ -200,6 +209,7 @@ export async function getSimilarPromos(
   const rows = await db
     .select({
       offerId: offers.id,
+      productId: offers.productId,
       shopSlug: shops.slug,
       rawName: offers.rawName,
       priceGrosze: offers.priceGrosze,
@@ -214,12 +224,31 @@ export async function getSimilarPromos(
     .where(and(
       eq(offers.category, promo.category),
       ne(offers.id, promo.offerId),
+      // "is distinct from" rather than <>: an unmatched offer has a null product
+      // and <> would silently drop every one of them.
+      promo.productId
+        ? sql`${offers.productId} is distinct from ${promo.productId}`
+        : sql`true`,
       lte(offers.validFrom, now),
       gte(offers.validTo, now),
     ))
-    .orderBy(sql`${offers.discountPercent} desc nulls last`)
-    .limit(limit)
-  return rows.map((r) => ({ ...r, hasImage: isBox(r.bbox) }))
+    .orderBy(sql`${effectiveDiscount} desc nulls last`)
+    // Read wide, then collapse: taking twelve rows first would spend the strip
+    // on repeat printings of three products.
+    .limit(limit * 8)
+
+  const seen = new Map<string, RelatedPromo & { productId: string | null }>()
+  for (const r of rows) {
+    const key = r.productId ?? `${r.shopSlug}|${r.rawName}`
+    const row = { ...r, hasImage: isBox(r.bbox) }
+    const kept = seen.get(key)
+    if (!kept) {
+      seen.set(key, row)
+    } else if ((row.priceGrosze ?? Infinity) < (kept.priceGrosze ?? Infinity)) {
+      seen.set(key, row)
+    }
+  }
+  return [...seen.values()].slice(0, limit)
 }
 
 /** Where the cropped tile for an offer lives. */
