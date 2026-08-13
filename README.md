@@ -104,6 +104,20 @@ screens would use. Light scheme only. Tables collapse to labelled cards below
 | `/leaflets/<id>?page=n` | The source page image with offer boxes overlaid — the fastest way to check a parse. |
 | `/api/promos`, `/api/products/<id>` | JSON for the first two. |
 
+### How two offers are compared
+
+Per unit when both sides print one on the same basis; otherwise on the shelf
+price. Most package goods print no per-unit figure at all — two 990 g bottles of
+ketchup are advertised at 8,99 and 8,49 and nothing else — so requiring one made
+the app decline to compare exactly the products people buy. Falling back is safe
+because the two offers are already matched, and matching enforces the same unit
+and a size within ±5%.
+
+Deriving the unit price from `price ÷ size` would let package goods sort by unit
+price too. Deliberately not done yet: a derived figure is only as trustworthy as
+the size extraction, and mixing it with printed ones in the "cheapest" logic
+would hide which is which. If it is added, it belongs in its own column.
+
 Prices marked **z kartą** require the shop's loyalty card, so they are not
 comparable to a plain shelf price. "Najtaniej" is decided on the normalized unit
 price and only among offers sharing the same basis (per kg, per l, or per piece),
