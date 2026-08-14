@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import pg from 'pg'
-import { listPromos } from '@/lib/queries/promos'
+import { listPromoPage, listPromos } from '@/lib/queries/promos'
 import { leaflets, offers, products, shops } from '@/lib/db/schema'
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL_TEST })
@@ -144,5 +144,39 @@ describe('listPromos', () => {
   it('carries the loyalty flag through', async () => {
     const rows = await listPromos(db, { now: NOW, shop: 'biedronka' })
     expect(rows[0]!.requiresLoyalty).toBe(true)
+  })
+})
+
+describe('listPromoPage', () => {
+  it('keeps shelf offers out of the grid and boxes them separately', async () => {
+    const [leaflet] = await db.select().from(leaflets).limit(1)
+    await db.insert(offers).values({
+      leafletId: leaflet!.id, pageNo: 9, rawName: 'WSZYSTKIE PRODUKTY FINISH',
+      name: 'wszystkie produkty finish', promoKind: 'percent',
+      discountPercent: 70, isGroup: true, dateSource: 'offer',
+      validFrom: new Date('2026-08-12T00:00:00Z'),
+      validTo: new Date('2026-08-14T00:00:00Z'),
+    })
+
+    const page = await listPromoPage(db, { now: NOW })
+    expect(page.rows.some((r) => r.isGroup)).toBe(false)
+    expect(page.groups.map((g) => g.rawName)).toEqual(['WSZYSTKIE PRODUKTY FINISH'])
+    expect(page.total).toBe(2)        // the butter and the bread, not the shelf
+    expect(page.groupTotal).toBe(1)
+  })
+
+  it('gives the whole set when the shelves are what was asked for', async () => {
+    const [leaflet] = await db.select().from(leaflets).limit(1)
+    await db.insert(offers).values({
+      leafletId: leaflet!.id, pageNo: 9, rawName: 'WSZYSTKIE PRODUKTY FINISH',
+      name: 'wszystkie produkty finish', promoKind: 'percent',
+      discountPercent: 70, isGroup: true, dateSource: 'offer',
+      validFrom: new Date('2026-08-12T00:00:00Z'),
+      validTo: new Date('2026-08-14T00:00:00Z'),
+    })
+
+    const page = await listPromoPage(db, { now: NOW, groupsOnly: true })
+    expect(page.rows).toHaveLength(0)
+    expect(page.groups).toHaveLength(1)
   })
 })

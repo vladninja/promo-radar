@@ -169,12 +169,18 @@ taniej" is an offer over a whole shelf, and the things it covers are printed
 elsewhere in the same leaflet. Treated as a product it is a card with no price,
 no unit price and nothing to compare against another shop.
 
-They are flagged `is_group` and get their own treatment: a `Cała półka` chip on
-the card, a detail page headed by the mechanic rather than by a price it does not
-have, no same-product-elsewhere section, and a strip of the products from that
-leaflet the offer probably covers — same brand where it names one, same aisle
-otherwise. Membership is inferred, not stated, and the page says so instead of
-claiming the shop promised it.
+They are flagged `is_group` and get their own treatment. On the home page they
+are lifted out of the grid entirely and shown as boxes above it — all of them,
+because each one is a way in to a dozen products and a capped list hides whole
+shelves. Sorted into the grid by discount they crowded its top instead: a screen
+of red tiles with no prices, because a shelf has no price. `?shelf=1` shows them
+on their own.
+
+Its detail page is headed by the mechanic rather than by a price it does not
+have, drops the same-product-elsewhere section, and carries a strip of the
+products from that leaflet the offer probably covers — same brand where it names
+one, same aisle otherwise. Membership is inferred, not stated, and the page says
+so instead of claiming the shop promised it.
 
 The similar-promotions strip keeps to one kind: a shelf offer among products is a
 card with no price, and products among shelf offers are the aisle rather than a

@@ -27,6 +27,7 @@ function promoFilters(c: Context): PromoFilters {
     q: q.q || undefined,
     shop: q.shop || undefined,
     crossShopOnly: q.cross === '1',
+    groupsOnly: q.shelf === '1',
     needsReview: q.review === '1',
     foodOnly: q.food === '1',
     category: (CATEGORIES as readonly string[]).includes(q.category ?? '')

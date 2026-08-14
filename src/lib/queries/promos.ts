@@ -8,6 +8,8 @@ export interface PromoFilters {
   q?: string
   shop?: string
   crossShopOnly?: boolean
+  /** Show the shelf offers instead of the products. */
+  groupsOnly?: boolean
   needsReview?: boolean
   category?: Category
   foodOnly?: boolean
@@ -54,6 +56,7 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
   if (f.category) where.push(eq(offers.category, f.category))
   if (f.foodOnly) where.push(inArray(offers.category, [...FOOD_CATEGORIES]))
   if (f.crossShopOnly) where.push(sql`${shopCount} > 1`)
+  if (f.groupsOnly) where.push(eq(offers.isGroup, true))
 
   const order = f.sort === 'unit'
     ? sql`${offers.unitPriceGrosze} asc nulls last`
@@ -133,7 +136,10 @@ export async function listPromos(db: Db, f: PromoFilters): Promise<PromoRow[]> {
 
 export interface PromoPage {
   rows: PromoRow[]
+  /** Shelf offers, kept out of the grid and shown as boxes above it. */
+  groups: PromoRow[]
   total: number
+  groupTotal: number
   page: number
   pages: number
 }
@@ -147,11 +153,24 @@ export async function listPromoPage(
   page = 1,
 ): Promise<PromoPage> {
   const all = await listPromos(db, f)
-  const pages = Math.max(1, Math.ceil(all.length / PAGE_SIZE))
+
+  // Shelf offers are pulled out rather than paged with the rest. Sorted by
+  // discount they crowd the top of the grid — a screen of red tiles with no
+  // prices, because a shelf has no price — and each one is a way in to a dozen
+  // products rather than a thing to buy. They belong above the grid, not in it.
+  const groups = all.filter((r) => r.isGroup)
+  const rows = all.filter((r) => !r.isGroup)
+
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const current = Math.min(Math.max(1, page), pages)
   return {
-    rows: all.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
-    total: all.length,
+    rows: f.groupsOnly ? [] : rows.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE),
+    // All of them, and only on the first screen: each is a way in to a dozen
+    // products, so a capped list hides whole shelves; repeated over every page
+    // they would be wallpaper.
+    groups: f.groupsOnly || current === 1 ? groups : [],
+    total: rows.length,
+    groupTotal: groups.length,
     page: current,
     pages,
   }

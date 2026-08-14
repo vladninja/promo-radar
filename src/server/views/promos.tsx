@@ -1,5 +1,5 @@
 import { Layout } from '@/server/views/layout'
-import { formatUnitPrice, formatZl, promoKindLabel } from '@/lib/format'
+import { formatPromo, formatUnitPrice, formatZl, promoKindLabel } from '@/lib/format'
 import { CrossShopIcon, LoyaltyIcon, ReviewIcon, ShopLogo } from '@/server/views/icons'
 import type { PromoFilters, PromoPage } from '@/lib/queries/promos'
 import { CATEGORIES, CATEGORY_LABELS } from '@/lib/normalize/category'
@@ -21,7 +21,7 @@ export function PromosView(props: {
   query: Record<string, string>
 }) {
   const { filters } = props
-  const { rows, total, page, pages } = props.result
+  const { rows, groups, total, groupTotal, page, pages } = props.result
   const shops = new Set(rows.map((r) => r.shopSlug)).size
   const crossShop = rows.filter((r) => r.shopCount > 1).length
   const linkTo = (n: number) => {
@@ -35,6 +35,7 @@ export function PromosView(props: {
       <h1>Promocje</h1>
       <p class="sub">
         {total} promocji w {shops} sklepach
+        {groupTotal > 0 ? ` · ${groupTotal} ofert na całą półkę` : ''}
         {crossShop > 0 ? ` · ${crossShop} na tej stronie jest w kilku sklepach` : ''}
         {pages > 1 ? ` · strona ${page} z ${pages}` : ''}
       </p>
@@ -65,14 +66,48 @@ export function PromosView(props: {
           W kilku sklepach
         </label>
         <label class="check">
+          <input type="checkbox" name="shelf" value="1" checked={filters.groupsOnly} />
+          Cała półka
+        </label>
+        <label class="check">
           <input type="checkbox" name="review" value="1" checked={filters.needsReview} />
           Do sprawdzenia
         </label>
         <button type="submit">Filtruj</button>
       </form>
 
+      {groups.length > 0 ? (
+        <section class="shelves">
+          <h2>
+            Oferty na całą półkę
+            <span class="count">{groupTotal}</span>
+            <span class="sub-inline">rabat na cały asortyment, nie na jeden produkt</span>
+          </h2>
+          <div class="shelf-grid">
+            {groups.map((g) => (
+              <a class="shelf-box" href={`/promos/${g.offerId}`}>
+                <div class="shelf-img">
+                  <img src={`/api/crop/${g.offerId}`} alt="" loading="lazy" />
+                </div>
+                <div class="shelf-body">
+                  <p class="pname">{g.rawName}</p>
+                  <p class="shelf-deal">
+                    {formatPromo(g.promoKind, g.minQty, g.discountPercent)}
+                  </p>
+                </div>
+                <span class="mark">
+                  <ShopLogo slug={g.shopSlug} name={SHOP_NAMES[g.shopSlug]} />
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       {rows.length === 0 ? (
-        <div class="card"><p class="empty">Brak promocji dla tych filtrów.</p></div>
+        groups.length > 0 ? null : (
+          <div class="card"><p class="empty">Brak promocji dla tych filtrów.</p></div>
+        )
       ) : (
         <div class="grid">
           {rows.map((r) => (

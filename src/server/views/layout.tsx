@@ -180,6 +180,44 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .icon.coupon { color: #b45309; }
 .icon.review { color: #be123c; }
 
+/* Shelf offers, boxed above the grid: bigger than a product card because each
+   one is a way in to a dozen products rather than a thing to buy. */
+.shelves { margin: 0 0 1.5rem; }
+.shelves h2 {
+  display: flex; align-items: center; gap: .5rem; margin: 0 0 .625rem;
+  font-size: 1rem; font-weight: 650; letter-spacing: -0.015em;
+}
+.shelves .count {
+  font-size: 11px; font-weight: 600; color: #c2410c; background: #fff7ed;
+  border: 1px solid #fed7aa; border-radius: 9999px; padding: .0625rem .4375rem;
+}
+.shelves .sub-inline { font-size: 12px; font-weight: 400; color: var(--muted-fg); }
+.shelf-grid {
+  display: grid; gap: .75rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+}
+.shelf-box {
+  position: relative; display: flex; gap: .75rem; align-items: stretch;
+  background: var(--card); border: 1px solid #fed7aa;
+  border-radius: var(--radius); overflow: hidden;
+  transition: box-shadow .12s ease, transform .12s ease;
+}
+.shelf-box:hover {
+  text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.07);
+  transform: translateY(-1px);
+}
+.shelf-img {
+  flex: 0 0 40%; background: #f4f4f5; aspect-ratio: 4 / 3;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.shelf-img img { width: 100%; height: 100%; object-fit: cover; }
+.shelf-body {
+  flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center;
+  gap: .25rem; padding: .625rem .75rem .625rem 0;
+}
+.shelf-deal { margin: 0; font-size: 13px; font-weight: 650; color: #c2410c; }
+.shelf-box .mark { left: auto; right: .5rem; bottom: .5rem; }
+
 /* Promotion detail */
 .crumbs { font-size: 12px; color: var(--muted-fg); margin: 0 0 .75rem; }
 .detail {
